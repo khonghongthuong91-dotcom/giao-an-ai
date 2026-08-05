@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>APP Tạo Giáo Án — soạn giáo án mầm non</title>
+  <meta name="description" content="Wizard 5 bước dựng giáo án mầm non đúng bố cục I – II – III với bảng hai cột hoạt động của cô và của trẻ. Sửa trực tiếp, tải Word, chuyển thành PowerPoint.">
+  <meta name="color-scheme" content="light">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <!-- Toàn bộ giao diện do js/app.js dựng vào đây. -->
+  <div id="app"></div>
+
+  <!-- Input file ẩn cho màn hình "Tải Word lên". -->
+  <input id="docx-picker" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+
+  <!--
+    Tất cả đều là script cổ điển (không phải ES module) để app mở được bằng cách
+    bấm đúp index.html — trình duyệt chặn `import` trên giao thức file://.
+    Thứ tự nạp là bắt buộc: dữ liệu và tiện ích trước, app.js sau cùng.
+  -->
+  <script src="js/data.js"></script>
+  <script src="js/compose.js"></script>
+  <script src="js/zip.js"></script>
+  <script src="js/docx.js"></script>
+  <script src="js/pptx.js"></script>
+  <script src="js/docx-read.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
