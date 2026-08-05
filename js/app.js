@@ -28,6 +28,10 @@
     view: startView,
     step: 1,
 
+    /* Đăng nhập minh họa — không nối tài khoản thật, xem README. */
+    loginForm: { username: '', password: '' },
+    loginError: null,
+
     /* Lựa chọn trong wizard — giá trị mặc định lấy từ bản thiết kế. */
     mixed: true,
     ages: ['Lớp ghép nhiều độ tuổi'],
@@ -136,11 +140,22 @@
     if (versionLabel) stamp(versionLabel);
   }
 
-  function icon(size) {
-    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" ' +
-      'stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M12 6.5C10.3 5 8 4.4 5 4.6v12.2c3-.2 5.3.4 7 1.9 1.7-1.5 4-2.1 7-1.9V4.6c-3-.2-5.3.4-7 1.9Z"></path>' +
-      '<path d="M12 6.5v12.2"></path></svg>';
+  /* Bông hoa làm biểu tượng của app — thay cho icon quyển sách trước đó. */
+  function flowerMark(size) {
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" aria-hidden="true">' +
+      '<g>' +
+        '<ellipse cx="12" cy="5.4" rx="3.3" ry="4.8" fill="#fff"></ellipse>' +
+        '<ellipse cx="12" cy="5.4" rx="3.3" ry="4.8" fill="#fff" transform="rotate(60 12 12)"></ellipse>' +
+        '<ellipse cx="12" cy="5.4" rx="3.3" ry="4.8" fill="#fff" transform="rotate(120 12 12)"></ellipse>' +
+        '<ellipse cx="12" cy="5.4" rx="3.3" ry="4.8" fill="#fff" transform="rotate(180 12 12)"></ellipse>' +
+        '<ellipse cx="12" cy="5.4" rx="3.3" ry="4.8" fill="#fff" transform="rotate(240 12 12)"></ellipse>' +
+        '<ellipse cx="12" cy="5.4" rx="3.3" ry="4.8" fill="#fff" transform="rotate(300 12 12)"></ellipse>' +
+        '<circle cx="12" cy="12" r="4.4" fill="#F8C85E"></circle>' +
+        '<circle cx="10.3" cy="11.2" r="0.55" fill="#6B5836"></circle>' +
+        '<circle cx="13.7" cy="11.2" r="0.55" fill="#6B5836"></circle>' +
+        '<path d="M10.3 13c.45.6 1.1.95 1.7.95s1.25-.35 1.7-.95" stroke="#6B5836" stroke-width="0.6" ' +
+        'fill="none" stroke-linecap="round"></path>' +
+      '</g></svg>';
   }
 
   /* Một hàng chip. `single` = chọn một, ngược lại là chọn nhiều. */
@@ -185,7 +200,7 @@
     return '<div class="login">' +
       '<div class="login__left">' +
         '<div class="brand">' +
-          '<div class="brand__mark">' + icon(28) + '</div>' +
+          '<div class="brand__mark">' + flowerMark(30) + '</div>' +
           '<div><div class="brand__name">APP TẠO GIÁO ÁN</div>' +
           '<div class="brand__sub">Giáo án mầm non có AI hỗ trợ</div></div>' +
         '</div>' +
@@ -196,15 +211,21 @@
           'chuyển thành PowerPoint.</p>' +
         '</div>' +
         '<div class="login__actions">' +
-          '<button type="button" class="btn-google" data-action="login">' +
-            '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">' +
-            '<path fill="#4285F4" d="M23 12.2c0-.8-.1-1.6-.2-2.3H12v4.4h6.2a5.3 5.3 0 0 1-2.3 3.5v2.9h3.7A11 11 0 0 0 23 12.2Z"></path>' +
-            '<path fill="#34A853" d="M12 23.5c3 0 5.5-1 7.3-2.7l-3.6-2.9a6.9 6.9 0 0 1-10.3-3.6H1.6v3A11.5 11.5 0 0 0 12 23.5Z"></path>' +
-            '<path fill="#FBBC05" d="M5.4 14.3a6.9 6.9 0 0 1 0-4.4v-3H1.6a11.5 11.5 0 0 0 0 10.4l3.8-3Z"></path>' +
-            '<path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.3 1.7l3.2-3.2A11.4 11.4 0 0 0 1.6 6.9l3.8 3A6.9 6.9 0 0 1 12 5.4Z"></path>' +
-            '</svg>Đăng nhập bằng Google</button>' +
-          '<div class="login__fine">Cần đăng nhập trước khi tạo giáo án. Ứng dụng không thu thập tên thật, ' +
-          'hình ảnh hay thông tin định danh của trẻ.</div>' +
+          '<div class="login__form">' +
+            '<label class="label"><span class="field-label">Tên đăng nhập</span>' +
+            '<input class="input" type="text" data-login-field="username" autocomplete="username" ' +
+            'value="' + attr(state.loginForm.username) + '" placeholder="Tên đăng nhập"></label>' +
+            '<label class="label"><span class="field-label">Mật khẩu</span>' +
+            '<input class="input" type="password" data-login-field="password" autocomplete="current-password" ' +
+            'value="' + attr(state.loginForm.password) + '" placeholder="Mật khẩu"></label>' +
+            (state.loginError ? '<div class="login__error">' + esc(state.loginError) + '</div>' : '') +
+            '<button type="button" class="btn btn--pink" ' +
+            'style="align-self:flex-start; font-size:16px; padding:14px 26px" ' +
+            'data-action="login">Đăng nhập</button>' +
+          '</div>' +
+          '<div class="login__fine">Đây là màn hình đăng nhập minh họa — nhập tên đăng nhập và mật khẩu bất kỳ ' +
+          'là vào được, chưa nối với hệ thống tài khoản thật. Ứng dụng không thu thập tên thật, hình ảnh hay ' +
+          'thông tin định danh của trẻ.</div>' +
         '</div>' +
       '</div>' +
       '<div class="login__right">' +
@@ -225,7 +246,7 @@
   function sidebar() {
     return '<aside class="sidebar">' +
       '<div class="sidebar__brand">' +
-        '<div class="sidebar__mark">' + icon(21) + '</div>' +
+        '<div class="sidebar__mark">' + flowerMark(23) + '</div>' +
         '<div class="sidebar__name">APP TẠO<br>GIÁO ÁN</div>' +
       '</div>' +
       '<nav class="nav" aria-label="Điều hướng chính">' +
@@ -1268,7 +1289,16 @@
   }
 
   var ACTIONS = {
-    login: function () { goto('dashboard'); },
+    login: function () {
+      var f = state.loginForm;
+      if (!f.username.trim() || !f.password.trim()) {
+        state.loginError = 'Nhập tên đăng nhập và mật khẩu.';
+        render();
+        return;
+      }
+      state.loginError = null;
+      goto('dashboard');
+    },
     logout: function () { goto('login'); },
     go: function (el) { goto(el.getAttribute('data-value')); },
     'start-wizard': function () { state.step = 1; goto('wizard'); },
@@ -1425,10 +1455,22 @@
       state.form[key] = el.value;
       return;
     }
+    var loginKey = el.getAttribute && el.getAttribute('data-login-field');
+    if (loginKey) {
+      state.loginForm[loginKey] = el.value;
+      return;
+    }
     if (el.getAttribute && el.getAttribute('data-search')) {
       state.query = el.value;
       state.focusId = el.id;
       render();
+    }
+  });
+
+  /* Enter trong ô mật khẩu/tên đăng nhập cũng đăng nhập được. */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && e.target.getAttribute && e.target.getAttribute('data-login-field')) {
+      ACTIONS.login();
     }
   });
 
