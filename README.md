@@ -47,6 +47,8 @@ js/docx.js          xuất .docx (OOXML)
 js/pptx.js          xuất .pptx (OOXML)
 js/docx-read.js     đọc .docx do giáo viên chọn
 js/app.js           state, render 11 màn hình, xử lý sự kiện
+ai-server.ps1        máy chủ AI cục bộ tùy chọn — gọi Claude Code CLI thật, xem "Chạy với AI thật"
+chay-voi-ai.bat       bấm đúp để chạy ai-server.ps1
 ```
 
 Tất cả đều là **script cổ điển, không phải ES module** — trình duyệt chặn
@@ -91,32 +93,69 @@ bản ghi theo giờ máy.
 
 ## Phần AI
 
-Bản thiết kế gọi `window.claude.complete()` — hàm này chỉ có trong môi trường
-xem trước của Claude Design. `js/compose.js` xử lý cả hai trường hợp:
+`js/compose.js` thử ba đường theo thứ tự, không bao giờ ném lỗi ra ngoài:
 
-- **Có `window.claude.complete`**: gọi thật, giữ nguyên prompt và JSON schema
-  của bản thiết kế, kể cả các quy tắc chuyên môn (lấy trẻ làm trung tâm, mục
-  tiêu quan sát được, cột hoạt động của trẻ không dùng câu "Trẻ chú ý lắng
-  nghe", lớp ghép bắt buộc có mục tiêu phân hóa).
-- **Không có**: app tự ghép giáo án từ đúng những gì giáo viên chọn trong
-  wizard — nhóm tuổi và lớp ghép, lĩnh vực, loại hoạt động, nội dung tích hợp,
-  tên truyện / thơ / bài hát / trò chơi, học liệu, mức độ chi tiết, giọng văn.
-  Đây **không phải mô hình ngôn ngữ**, nhưng ra giáo án thật theo bố cục I – II
-  – III với 6 hoạt động và thời lượng chia theo tổng thời gian đã nhập, không
-  phải chữ giả.
+1. **`window.claude.complete`** — chỉ có trong môi trường xem trước của Claude
+   Design.
+2. **Máy chủ AI cục bộ** (`ai-server.ps1`) — gọi **AI thật**, xem mục "Chạy với
+   AI thật" ngay dưới đây.
+3. **Bộ dựng cục bộ** — nếu không có cả hai đường trên, app tự ghép giáo án từ
+   đúng những gì giáo viên chọn trong wizard: nhóm tuổi và lớp ghép, lĩnh vực,
+   loại hoạt động, nội dung tích hợp, tên truyện / thơ / bài hát / trò chơi,
+   học liệu, mức độ chi tiết, giọng văn. Đây **không phải mô hình ngôn ngữ**,
+   nhưng ra giáo án thật theo bố cục I – II – III với 6 hoạt động, không phải
+   chữ giả.
 
 Giao diện nói rõ đang dùng đường nào: dòng nhãn ở đầu trình soạn thảo ghi *GIÁO
 ÁN DO AI TẠO*, *APP DỰNG TỪ LỰA CHỌN CỦA CHỊ*, *ĐỌC TỪ FILE WORD* hoặc *GIÁO ÁN
 MẪU*, và ghi chú cạnh nút tạo giáo án cũng nói trước điều đó.
 
-Bảy việc ở khung *Nhờ AI chỉnh sửa* cũng chạy trên máy. Năm việc có sửa nội
-dung thật (viết lại hoạt động trọng tâm, rút gọn còn 20 phút, bổ sung trò chơi
-củng cố, chuyển sang 5–6 tuổi, tăng tính trải nghiệm) — bấm *Áp dụng thay đổi*
-là giáo án đổi thật và ghi một mốc vào lịch sử phiên bản. Hai việc còn lại
-(*Kiểm tra an toàn*, *Kiểm tra chính tả tiếng Việt*) chỉ rà soát, nên hộp xem
-trước bỏ nút *Áp dụng thay đổi* và chỉ còn *Đóng bản rà soát* — khác bản thiết
-kế một chút, vì để nút "áp dụng" cho một bản rà soát không có gì để áp dụng thì
-dễ gây hiểu nhầm.
+Bảy việc ở khung *Nhờ AI chỉnh sửa* cũng đi qua cùng ba đường trên. Năm việc có
+sửa nội dung thật (viết lại hoạt động trọng tâm, rút gọn còn 20 phút, bổ sung
+trò chơi củng cố, chuyển sang 5–6 tuổi, tăng tính trải nghiệm) — bấm *Áp dụng
+thay đổi* là giáo án đổi thật và ghi một mốc vào lịch sử phiên bản. Hai việc
+còn lại (*Kiểm tra an toàn*, *Kiểm tra chính tả tiếng Việt*) chỉ rà soát, nên
+hộp xem trước bỏ nút *Áp dụng thay đổi* và chỉ còn *Đóng bản rà soát* — khác
+bản thiết kế một chút, vì để nút "áp dụng" cho một bản rà soát không có gì để
+áp dụng thì dễ gây hiểu nhầm.
+
+### Chạy với AI thật
+
+`ai-server.ps1` gọi **Claude Code CLI** (`claude -p`) ngay trên máy, dùng đúng
+phiên đăng nhập Claude Code đã có sẵn — không cần API key riêng, không cần
+đăng nhập lại.
+
+Điều kiện: máy đã cài Claude Code CLI và đã đăng nhập một lần (gõ `claude`
+trong terminal một lần để đăng nhập, nếu chưa từng dùng).
+
+Cách chạy:
+
+1. Bấm đúp **`chay-voi-ai.bat`** (hoặc `powershell -ExecutionPolicy Bypass
+   -File ai-server.ps1`). Cửa sổ terminal hiện dòng
+   `... may chu AI cuc bo dang chay tai http://localhost:8787/`.
+2. Mở **`http://localhost:8787/`** bằng trình duyệt — không bấm đúp
+   `index.html` nữa, vì lúc đó app không có máy chủ đứng sau để gọi AI.
+3. Dùng app bình thường. Nút *TẠO GIÁO ÁN BẰNG AI* và cả 7 việc ở khung *Nhờ
+   AI chỉnh sửa* giờ gọi Claude thật.
+4. Đóng cửa sổ terminal đó để tắt máy chủ.
+
+Vài điều cần biết:
+
+- **Chậm hơn mẫu demo**: một giáo án đầy đủ 6 hoạt động mất khoảng 1–2 phút để
+  Claude soạn xong (đã đo thực tế: 60–125 giây), vì đây là gọi mô hình thật,
+  không phải chữ dựng sẵn. Nút *ĐANG TẠO GIÁO ÁN...* bị khóa trong lúc chờ.
+- **Có tính phí**: mỗi lần tạo giáo án hoặc nhờ AI chỉnh sửa dùng hạn mức
+  Claude Code của tài khoản đang đăng nhập (đã đo thực tế: khoảng
+  $0.05–$0.25 một lần gọi). `ai-server.ps1` giới hạn tối đa $2.5 một lần gọi
+  (`--max-budget-usd`) để tránh vượt hạn mức nếu có gì bất thường.
+- **An toàn**: tiến trình `claude` được gọi với `--tools ""` (tắt hết công cụ)
+  nên chỉ có thể trả về chữ, không đọc/ghi file hay chạy lệnh trên máy — kể cả
+  khi nội dung giáo viên gõ vào các trường tự do (yêu cầu riêng, tên hoạt
+  động...) có cố tình chứa chỉ dẫn lạ.
+- **Không mở port ra ngoài**: máy chủ chỉ nghe ở `localhost:8787`, máy khác
+  trong mạng không gọi được.
+- Không có Claude Code CLI, hoặc mở app bằng cách bấm đúp `index.html` như cũ
+  → app tự động rơi về bộ dựng cục bộ, không báo lỗi.
 
 ## Khác với bản thiết kế
 

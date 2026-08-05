@@ -1,3 +1,6 @@
 # File thử nghiệm tạm thời, không thuộc app.
 __test.docx
 *.crdownload
+
+# Thư mục làm việc riêng cho tiến trình claude.exe khi chạy ai-server.ps1.
+.ai-cwd/

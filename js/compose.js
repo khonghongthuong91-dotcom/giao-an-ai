@@ -385,22 +385,150 @@
       'Cần 6 hoạt động: ổn định; dẫn dắt; trọng tâm; trẻ thực hành/trải nghiệm; trò chơi củng cố; nhận xét và kết thúc.';
   }
 
-  function hasModel() {
+  /*
+    Hai đường gọi mô hình thật:
+
+      • `window.claude.complete()` — chỉ có trong môi trường xem trước của
+        Claude Design.
+      • Máy chủ AI cục bộ (`ai-server.ps1`) — chạy `claude -p` (Claude Code
+        CLI) ngay trên máy giáo viên, dùng chính phiên đăng nhập Claude Code
+        đã có sẵn, không cần API key riêng. Xem README phần "Chạy với AI thật".
+
+    `checkLocalAi()` dò máy chủ cục bộ một lần khi trang vừa tải (health-check
+    nhanh, không gọi mô hình). Nếu không thấy cả hai, `generate()`/`review()`
+    rơi về bộ dựng cục bộ như trước — không bao giờ ném lỗi ra ngoài.
+  */
+  var localAiAvailable = false;
+  var localAiChecked = false;
+
+  function hasClaudeDesign() {
     return !!(window.claude && typeof window.claude.complete === 'function');
   }
 
+  function aiReachable() {
+    return hasClaudeDesign() || localAiAvailable;
+  }
+
+  function checkLocalAi() {
+    if (hasClaudeDesign()) { localAiChecked = true; return Promise.resolve(true); }
+    var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+    var timer = ctrl && setTimeout(function () { ctrl.abort(); }, 1500);
+    return fetch('/api/health', { cache: 'no-store', signal: ctrl && ctrl.signal })
+      .then(function (r) { return r.ok; })
+      .catch(function () { return false; })
+      .then(function (ok) {
+        if (timer) clearTimeout(timer);
+        localAiAvailable = ok;
+        localAiChecked = true;
+        if (window.COMPOSE && window.COMPOSE.onAiStatusChange) window.COMPOSE.onAiStatusChange();
+        return ok;
+      });
+  }
+
+  /* Lấy JSON đầu tiên trong một đoạn text — window.claude.complete không đảm bảo trả JSON thuần. */
+  function extractJson(raw) {
+    var m = String(raw).match(/\{[\s\S]*\}/);
+    return m ? m[0] : raw;
+  }
+
+  /*
+    Gọi mô hình thật qua một trong hai đường, trả về Promise<string> (text
+    thô, ở đường máy chủ cục bộ đã là JSON hợp lệ theo schema).
+  */
+  function callModel(prompt, schema) {
+    if (hasClaudeDesign()) {
+      return window.claude.complete({
+        model: 'claude-sonnet-4-5', max_tokens: 8000,
+        messages: [{ role: 'user', content: prompt }]
+      });
+    }
+    return fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ prompt: prompt, schema: schema || null })
+    }).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (data) {
+        if (!res.ok || !data) throw new Error('máy chủ AI trả về lỗi (' + res.status + ')');
+        if (!data.ok) throw new Error(data.error || 'lỗi không rõ từ máy chủ AI');
+        return data.text;
+      });
+    });
+  }
+
+  function hasModel() { return aiReachable(); }
+
+  /* JSON Schema đúng cấu trúc giáo án — dùng cho --json-schema của claude -p. */
+  var LESSON_SCHEMA = {
+    type: 'object',
+    properties: {
+      info: {
+        type: 'object',
+        properties: {
+          school: { type: 'string' }, teacher: { type: 'string' }, className: { type: 'string' },
+          ageLabel: { type: 'string' }, size: { type: 'string' }, date: { type: 'string' },
+          theme: { type: 'string' }, subtheme: { type: 'string' }, activity: { type: 'string' },
+          domain: { type: 'string' }, type: { type: 'string' }, duration: { type: 'string' },
+          place: { type: 'string' }, form: { type: 'string' }
+        },
+        required: ['school', 'teacher', 'className', 'ageLabel', 'size', 'date', 'theme', 'subtheme',
+          'activity', 'domain', 'type', 'duration', 'place', 'form']
+      },
+      objectives: {
+        type: 'object',
+        properties: {
+          knowledge: { type: 'array', items: { type: 'string' } },
+          skills: { type: 'array', items: { type: 'string' } },
+          attitude: { type: 'array', items: { type: 'string' } },
+          integrated: { type: 'array', items: { type: 'string' } },
+          differentiated: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: { group: { type: 'string' }, items: { type: 'array', items: { type: 'string' } } },
+              required: ['group', 'items']
+            }
+          }
+        },
+        required: ['knowledge', 'skills', 'attitude', 'integrated', 'differentiated']
+      },
+      prep: {
+        type: 'object',
+        properties: {
+          teacher: { type: 'array', items: { type: 'string' } },
+          children: { type: 'array', items: { type: 'string' } },
+          environment: { type: 'array', items: { type: 'string' } },
+          materials: { type: 'array', items: { type: 'string' } },
+          digital: { type: 'array', items: { type: 'string' } },
+          safety: { type: 'array', items: { type: 'string' } },
+          backup: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['teacher', 'children', 'environment', 'materials', 'digital', 'safety', 'backup']
+      },
+      activities: {
+        type: 'array', minItems: 6, maxItems: 6,
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' }, time: { type: 'string' },
+            teacher: { type: 'array', items: { type: 'string' } },
+            child: { type: 'array', items: { type: 'string' } },
+            responses: { type: 'string' }, support: { type: 'string' },
+            extend: { type: 'string' }, safety: { type: 'string' }
+          },
+          required: ['name', 'time', 'teacher', 'child', 'responses', 'support', 'extend', 'safety']
+        }
+      }
+    },
+    required: ['info', 'objectives', 'prep', 'activities']
+  };
+
   /* Trả về { lesson, source: 'model' | 'local', error } — không bao giờ ném lỗi. */
   function generate(state) {
-    if (!hasModel()) {
+    if (!aiReachable()) {
       return Promise.resolve({ lesson: composeLesson(state), source: 'local', error: null });
     }
-    return window.claude.complete({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 8000,
-      messages: [{ role: 'user', content: buildPrompt(state) }]
-    }).then(function (out) {
-      var m = String(out).match(/\{[\s\S]*\}/);
-      var data = JSON.parse(m ? m[0] : out);
+    return callModel(buildPrompt(state), LESSON_SCHEMA).then(function (out) {
+      var data = JSON.parse(extractJson(out));
       if (!data.activities || !data.activities.length) throw new Error('thiếu hoạt động');
       return { lesson: data, source: 'model', error: null };
     }).catch(function (err) {
@@ -607,11 +735,13 @@
   /* ── Bản xem trước "Nhờ AI chỉnh sửa" ─────────────────────────────────── */
 
   /*
-    Mỗi việc trả về { text, patch } — `text` là bản xem trước cho cô đọc,
-    `patch(lesson)` là hàm sửa giáo án khi cô bấm "Áp dụng thay đổi". Việc nào
-    chỉ rà soát thì không có `patch`, và giao diện chỉ hiện nút đóng.
+    Bản dựng cục bộ, không cần mạng — dùng khi không nối được AI thật, hoặc
+    khi gọi AI thật bị lỗi giữa chừng. Mỗi việc trả về { text, patch }: `text`
+    là bản xem trước cho cô đọc, `patch(lesson)` là hàm sửa giáo án khi cô bấm
+    "Áp dụng thay đổi". Việc nào chỉ rà soát thì không có `patch`, và giao
+    diện chỉ hiện nút đóng.
   */
-  function review(key, lesson) {
+  function reviewLocal(key, lesson) {
     var acts = lesson.activities || [];
     var central = Math.min(2, acts.length - 1);
 
@@ -809,11 +939,182 @@
     return { text: 'Chưa có nội dung cho việc này.' };
   }
 
+  /* Việc nào chỉ rà soát (không sửa giáo án) thì AI cũng không trả patch. */
+  var REVIEW_ONLY = ['Kiểm tra an toàn', 'Kiểm tra chính tả tiếng Việt'];
+
+  /* JSON Schema cho từng việc "Nhờ AI chỉnh sửa" — luôn có "summary" (bản xem
+     trước cho cô đọc), phần còn lại là nội dung để applyReviewPatch() ghép
+     vào giáo án. */
+  var REVIEW_SCHEMAS = {
+    'Viết lại hoạt động trọng tâm': {
+      type: 'object',
+      properties: {
+        summary: { type: 'string' },
+        teacher: { type: 'array', items: { type: 'string' } },
+        child: { type: 'array', items: { type: 'string' } }
+      },
+      required: ['summary', 'teacher', 'child']
+    },
+    'Rút gọn giáo án': {
+      type: 'object',
+      properties: {
+        summary: { type: 'string' },
+        targetMinutes: { type: 'number' },
+        times: { type: 'array', items: { type: 'string' } }
+      },
+      required: ['summary', 'targetMinutes', 'times']
+    },
+    'Bổ sung một trò chơi củng cố': {
+      type: 'object',
+      properties: {
+        summary: { type: 'string' }, name: { type: 'string' }, time: { type: 'string' },
+        teacher: { type: 'array', items: { type: 'string' } },
+        child: { type: 'array', items: { type: 'string' } },
+        responses: { type: 'string' }, support: { type: 'string' },
+        extend: { type: 'string' }, safety: { type: 'string' }
+      },
+      required: ['summary', 'name', 'time', 'teacher', 'child', 'responses', 'support', 'extend', 'safety']
+    },
+    'Chuyển sang nhóm tuổi 5–6 tuổi': {
+      type: 'object',
+      properties: {
+        summary: { type: 'string' },
+        knowledge: { type: 'array', items: { type: 'string' } },
+        skills: { type: 'array', items: { type: 'string' } },
+        attitude: { type: 'array', items: { type: 'string' } }
+      },
+      required: ['summary', 'knowledge', 'skills', 'attitude']
+    },
+    'Tăng tính trải nghiệm': {
+      type: 'object',
+      properties: {
+        summary: { type: 'string' }, addTeacher: { type: 'string' },
+        addChild: { type: 'string' }, materialsAdd: { type: 'string' }
+      },
+      required: ['summary', 'addTeacher', 'addChild', 'materialsAdd']
+    },
+    'Kiểm tra an toàn': {
+      type: 'object', properties: { summary: { type: 'string' } }, required: ['summary']
+    },
+    'Kiểm tra chính tả tiếng Việt': {
+      type: 'object', properties: { summary: { type: 'string' } }, required: ['summary']
+    }
+  };
+
+  function buildReviewPrompt(key, lesson) {
+    var acts = lesson.activities || [];
+    var central = Math.min(2, acts.length - 1);
+    var experienceIdx = Math.min(3, acts.length - 1);
+    var ctx = JSON.stringify({
+      info: lesson.info,
+      activities: acts.map(function (a) { return { name: a.name, time: a.time, teacher: a.teacher, child: a.child }; }),
+      objectives: lesson.objectives, prep: lesson.prep
+    });
+
+    var INSTR = {
+      'Viết lại hoạt động trọng tâm': 'Viết lại hoạt động thứ ' + (central + 1) +
+        ' ("' + ((acts[central] || {}).name || '') + '") cho sinh động hơn, giữ nguyên thời lượng. ' +
+        'Trả về "teacher" và "child" là hai mảng câu mới cho đúng hoạt động này. ' +
+        'Cột "child" phải cụ thể việc trẻ làm được, KHÔNG dùng câu "Trẻ chú ý lắng nghe".',
+      'Rút gọn giáo án': 'Rút bảng hoạt động về khoảng 20 phút tổng cộng, giữ đủ ' + acts.length +
+        ' hoạt động theo đúng thứ tự hiện có. Trả về "times": mảng thời lượng mới (chuỗi kiểu "3 phút"), ' +
+        'đúng ' + acts.length + ' phần tử theo đúng thứ tự, và "targetMinutes" là tổng số phút mới.',
+      'Bổ sung một trò chơi củng cố': 'Đề xuất một trò chơi củng cố khoảng 4 phút phù hợp với ' +
+        lesson.info.ageLabel + ', nêu luật chơi ngắn trong "summary". Trả về đủ các trường của một hàng ' +
+        'hoạt động mới: name, time, teacher (mảng), child (mảng), responses, support, extend, safety.',
+      'Chuyển sang nhóm tuổi 5–6 tuổi': 'Điều chỉnh ba khối mục tiêu (kiến thức, kỹ năng, thái độ) cho ' +
+        'nhóm 5–6 tuổi — nâng mức độ nhưng không hàn lâm, trẻ vẫn học qua chơi.',
+      'Tăng tính trải nghiệm': 'Đề xuất thêm cho hoạt động thứ ' + (experienceIdx + 1) +
+        ' ("' + ((acts[experienceIdx] || {}).name || '') + '") một đoạn để trẻ tự thao tác, thử nghiệm và ' +
+        'tạo sản phẩm đơn giản. Trả về "addTeacher" (một câu cô làm), "addChild" (một câu trẻ làm) và ' +
+        '"materialsAdd" (một câu học liệu cần thêm).',
+      'Kiểm tra an toàn': 'Rà soát nguy cơ mất an toàn trong bảng hoạt động và nêu biện pháp cụ thể trong ' +
+        '"summary". Đây chỉ là bản rà soát, không đề xuất sửa nội dung giáo án.',
+      'Kiểm tra chính tả tiếng Việt': 'Liệt kê lỗi chính tả hoặc diễn đạt chưa rõ trong bảng hoạt động và ' +
+        'cách sửa, viết trong "summary". Đây chỉ là bản rà soát, không tự sửa nội dung giáo án.'
+    };
+
+    return 'Bạn là chuyên gia giáo dục mầm non Việt Nam, đang biên tập một giáo án đã có sẵn.\n' +
+      'Giáo án hiện tại (JSON): ' + ctx + '\n\n' +
+      'Yêu cầu: ' + (INSTR[key] || key) + '\n' +
+      'Quy tắc chung: lấy trẻ làm trung tâm, học qua chơi, không hoạt động nguy hiểm, không thu thập thông ' +
+      'tin định danh của trẻ, không bịa số hiệu văn bản pháp lý.\n' +
+      'Trả về DUY NHẤT một JSON hợp lệ đúng schema đã cho. "summary" là đoạn văn bản ngắn gọn, dễ đọc, ' +
+      'tiếng Việt có dấu, để giáo viên xem trước trong hộp thoại — không lồng JSON vào trong "summary".';
+  }
+
+  function applyReviewPatch(key, lesson, data) {
+    var acts = lesson.activities || [];
+    if (key === 'Viết lại hoạt động trọng tâm') {
+      var central = Math.min(2, acts.length - 1);
+      if (acts[central]) { acts[central].teacher = data.teacher; acts[central].child = data.child; }
+    } else if (key === 'Rút gọn giáo án') {
+      acts.forEach(function (a, i) { if (data.times && data.times[i]) a.time = data.times[i]; });
+      lesson.info.duration = (data.targetMinutes || totalMinutes(lesson.info.duration)) + ' phút';
+    } else if (key === 'Bổ sung một trò chơi củng cố') {
+      acts.splice(Math.max(0, acts.length - 1), 0, {
+        name: data.name, time: data.time, teacher: data.teacher, child: data.child,
+        responses: data.responses, support: data.support, extend: data.extend, safety: data.safety
+      });
+    } else if (key === 'Chuyển sang nhóm tuổi 5–6 tuổi') {
+      lesson.objectives.knowledge = data.knowledge;
+      lesson.objectives.skills = data.skills;
+      lesson.objectives.attitude = data.attitude;
+      lesson.objectives.differentiated = [];
+      lesson.info.ageLabel = '5–6 tuổi';
+    } else if (key === 'Tăng tính trải nghiệm') {
+      var idx = Math.min(3, acts.length - 1);
+      if (acts[idx]) { acts[idx].teacher.push(data.addTeacher); acts[idx].child.push(data.addChild); }
+      lesson.prep.materials = (lesson.prep.materials || []).concat([data.materialsAdd]);
+    }
+    return lesson;
+  }
+
+  /*
+    Trả về Promise<{ text, patch, source }>. Gọi AI thật khi nối được (Claude
+    Design hoặc máy chủ cục bộ); lỗi giữa chừng — mất mạng, hết hạn mức, AI trả
+    sai schema — đều rơi về reviewLocal() thay vì hiện lỗi trắng cho cô.
+  */
+  function review(key, lesson) {
+    var canApply = REVIEW_ONLY.indexOf(key) === -1;
+    if (!aiReachable()) {
+      return Promise.resolve(assign({ source: 'local' }, reviewLocal(key, lesson)));
+    }
+    var schema = REVIEW_SCHEMAS[key];
+    return callModel(buildReviewPrompt(key, lesson), schema).then(function (raw) {
+      var data = JSON.parse(extractJson(raw));
+      return {
+        text: data.summary,
+        patch: canApply ? function (L) { return applyReviewPatch(key, L, data); } : null,
+        source: 'model'
+      };
+    }).catch(function (err) {
+      var local = reviewLocal(key, lesson);
+      local.text += '\n\n(Không gọi được AI thật — ' +
+        (err && err.message ? err.message : 'lỗi không rõ') + '. Đây là bản do app tự dựng.)';
+      local.source = 'local';
+      return local;
+    });
+  }
+
+  function assign(target) {
+    for (var i = 1; i < arguments.length; i++) {
+      var src = arguments[i];
+      for (var k in src) if (Object.prototype.hasOwnProperty.call(src, k)) target[k] = src[k];
+    }
+    return target;
+  }
+
+  checkLocalAi();
+
   window.COMPOSE = {
     generate: generate,
     composeLesson: composeLesson,
     buildPrompt: buildPrompt,
     hasModel: hasModel,
+    isAiReady: aiReachable,
+    checkLocalAi: checkLocalAi,
+    onAiStatusChange: null,
     checks: checks,
     slides: slides,
     review: review,

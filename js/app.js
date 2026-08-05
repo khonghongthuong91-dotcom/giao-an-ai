@@ -1214,15 +1214,17 @@
 
   function aiAction(label) {
     var pair = D.aiActions.filter(function (p) { return p[0] === label; })[0];
-    var result = C.review(label, state.lesson);
-    state.aiPreview = {
-      key: label,
-      label: pair ? pair[1] : label,
-      text: result.text,
-      canApply: !!result.patch
-    };
-    state._pendingPatch = result.patch || null;
+    var modalLabel = pair ? pair[1] : label;
+    state.aiPreview = { key: label, label: modalLabel, text: 'Đang soạn bản xem trước...', canApply: false };
+    state._pendingPatch = null;
     render();
+    C.review(label, state.lesson).then(function (result) {
+      /* Cô có thể đã đóng hộp thoại hoặc bấm việc khác trong lúc chờ AI trả lời. */
+      if (!state.aiPreview || state.aiPreview.key !== label) return;
+      state.aiPreview = { key: label, label: modalLabel, text: result.text, canApply: !!result.patch };
+      state._pendingPatch = result.patch || null;
+      render();
+    });
   }
 
   function acceptPreview() {
@@ -1547,6 +1549,10 @@
   });
 
   /* ── Khởi động ───────────────────────────────────────────────────────── */
+
+  /* Dò máy chủ AI cục bộ xong thì vẽ lại — để các dòng ghi chú phụ thuộc vào
+     C.hasModel() (ví dụ ở bước 5 của wizard) cập nhật đúng ngay khi biết. */
+  C.onAiStatusChange = render;
 
   stamp('Mở giáo án mẫu');
   render();
