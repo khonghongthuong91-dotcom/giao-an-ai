@@ -1,7 +1,13 @@
 # APP Tạo Giáo Án
 
 Bản hiện thực của thiết kế Claude Design `App Tạo Giáo Án.dc.html`
-(project *APP tạo giáo án*, `d484c978-be1a-406f-87e9-9b79ab3a0940`).
+(project *Prototype giáo án AI*, `87172a93-3a24-459c-a7a6-ec7e9288938d` —
+bản trước lấy từ project `d484c978-be1a-406f-87e9-9b79ab3a0940`). Giao diện
+dùng bảng màu xanh ngọc của bản thiết kế mới nhất; phần xuất Word/PowerPoint
+và chuỗi dự phòng AI vẫn giữ nguyên cách làm cũ (tự dựng OOXML, không cần
+mạng) vì bản thiết kế dùng thư viện CDN và `window.claude.complete` — chỉ
+chạy được trong khung xem trước của Claude Design, không chạy được khi mở
+app này như một ứng dụng độc lập.
 
 App soạn giáo án mầm non: wizard 5 bước → giáo án đúng bố cục I – II – III với
 bảng hai cột *Hoạt động của cô* / *Hoạt động của trẻ* → sửa trực tiếp → tải
@@ -22,14 +28,20 @@ Mở nhanh một màn hình bất kỳ:
 | Đăng nhập | `index.html` |
 | Trang chủ | `index.html?screen=dashboard` |
 | Tạo giáo án (wizard) | `index.html?screen=wizard` |
-| Trình soạn thảo | `index.html?screen=editor` |
-| Giáo án của tôi | `index.html?screen=library` |
-| Thư viện mẫu | `index.html?screen=templates` |
-| Tải Word lên | `index.html?screen=upload` |
-| Xem trước Word | `index.html?screen=word` |
-| Xem trước PowerPoint | `index.html?screen=ppt` |
-| Căn cứ và tham chiếu | `index.html?screen=refs` |
-| Quản trị | `index.html?screen=admin` |
+| Trình soạn thảo | `index.html?screen=editor` (mở từ một giáo án trong *Giáo án đã lưu*) |
+| Giáo án đã lưu | `index.html?screen=library` |
+| Word sang PowerPoint | `index.html?screen=upload` |
+| Xem trước Word | `index.html?screen=word` (mở từ nút *Tải Word* trong trình soạn thảo) |
+| Tạo PowerPoint | `index.html?screen=ppt` |
+| Kho học liệu | `index.html?screen=materials` |
+| Hồ sơ cá nhân | `index.html?screen=profile` |
+| Cấu hình chương trình | `index.html?screen=admin` |
+
+Thanh bên chỉ còn 8 mục, đúng bản thiết kế mới nhất — bỏ *Thư viện mẫu* (mẫu
+giáo án dựng sẵn) và gộp *Căn cứ và tham chiếu* vào *Cấu hình chương trình*
+(danh mục văn bản chương trình, sửa được trạng thái, thêm, xóa). *Trình soạn
+thảo* và *Xem trước Word* vẫn là màn hình có thật, chỉ không còn nằm ở thanh
+bên nữa.
 
 Hai công tắc mà bản thiết kế để ở khung *Prototype* thành tham số đường dẫn:
 `?checks=0` ẩn khung *Cảnh báo kiểm tra*, `?notes=0` ẩn *Ghi chú cho cô* ở màn
@@ -194,9 +206,9 @@ Vài điều cần biết:
 
 Toàn bộ chữ tiếng Việt trong `js/data.js` lấy nguyên văn từ bản thiết kế: giáo
 án mẫu *Khi con tức giận* (lớp ghép 3–4 và 4–5 tuổi, lĩnh vực tình cảm và kỹ
-năng xã hội, 25–30 phút), 6 giáo án trong thư viện, 10 mẫu, 7 văn bản pháp lý,
-và các danh mục độ tuổi / lĩnh vực / loại hoạt động / nội dung tích hợp / kiểu
-giáo án / giọng văn.
+năng xã hội, 25–30 phút), 6 giáo án trong thư viện, 10 học liệu trong *Kho học
+liệu*, 7 văn bản pháp lý trong *Cấu hình chương trình*, và các danh mục độ
+tuổi / lĩnh vực / loại hoạt động / nội dung tích hợp / kiểu giáo án / giọng văn.
 
 Câu mẫu mà bộ dựng giáo án dùng khi không có mô hình ngôn ngữ nằm trong
 `js/compose.js`, chia theo nhóm lĩnh vực (thể chất, ngôn ngữ, tình cảm – xã

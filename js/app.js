@@ -19,8 +19,8 @@
   /* ── State ───────────────────────────────────────────────────────────── */
 
   var params = new URLSearchParams(location.search);
-  var VIEWS = ['login', 'dashboard', 'wizard', 'editor', 'library', 'templates',
-    'upload', 'word', 'ppt', 'refs', 'admin'];
+  var VIEWS = ['login', 'dashboard', 'wizard', 'editor', 'library',
+    'upload', 'word', 'ppt', 'materials', 'profile', 'admin'];
   var startView = params.get('screen');
   if (VIEWS.indexOf(startView) === -1) startView = 'login';
 
@@ -85,6 +85,19 @@
 
     /* PowerPoint. */
     slideCount: 'Tự động đề xuất',
+    uploadsCount: 0,
+
+    /* Hồ sơ cá nhân. */
+    profile: deepCopy(D.profileDefault),
+
+    /* Kho học liệu. */
+    matQuery: '', matAge: '', matType: '', matFavs: [], myMaterials: [],
+
+    /* Cấu hình chương trình — văn bản pháp lý đơn vị đang áp dụng, sửa được. */
+    config: D.refs.map(function (r) {
+      var statusMap = { 'Đang có hiệu lực': 'Đang áp dụng', 'Chưa xác minh': 'Sắp áp dụng', 'Sắp có hiệu lực': 'Sắp áp dụng' };
+      return { code: r[0], name: r[1], org: r[2], effective: r[3], status: statusMap[r[4]] || 'Đang áp dụng', checked: r[5] };
+    }),
 
     /* Quản trị. */
     adminToggles: { ai: true, upload: true, admin: false, beta: false },
@@ -156,6 +169,22 @@
         '<path d="M10.3 13c.45.6 1.1.95 1.7.95s1.25-.35 1.7-.95" stroke="#6B5836" stroke-width="0.6" ' +
         'fill="none" stroke-linecap="round"></path>' +
       '</g></svg>';
+  }
+
+  /* Icon cho từng mục ở thanh bên — path lấy từ bản thiết kế. */
+  function navIcon(key) {
+    var P = {
+      home: '<path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M9 22V12h6v10"></path>',
+      plus: '<path d="M12 5v14"></path><path d="M5 12h14"></path>',
+      bookmark: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>',
+      monitor: '<rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M12 17v4"></path><path d="M8 21h8"></path>',
+      wordArrow: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5-5 5 5"></path><path d="M12 5v12"></path>',
+      books: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>',
+      user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>',
+      sliders: '<path d="M20 7h-9"></path><path d="M14 17H5"></path><circle cx="17" cy="17" r="3"></circle><circle cx="7" cy="7" r="3"></circle>'
+    };
+    return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+      'stroke-linecap="round" stroke-linejoin="round">' + (P[key] || '') + '</svg>';
   }
 
   /* Một hàng chip. `single` = chọn một, ngược lại là chọn nhiều. */
@@ -247,14 +276,19 @@
     return '<aside class="sidebar">' +
       '<div class="sidebar__brand">' +
         '<div class="sidebar__mark">' + flowerMark(23) + '</div>' +
-        '<div class="sidebar__name">APP TẠO<br>GIÁO ÁN</div>' +
+        '<div style="min-width:0">' +
+          '<div class="sidebar__name">APP TẠO GIÁO ÁN</div>' +
+          '<div class="sidebar__sub">Trợ lý AI cho giáo viên mầm non</div>' +
+        '</div>' +
       '</div>' +
       '<nav class="nav" aria-label="Điều hướng chính">' +
         D.nav.map(function (item) {
-          var on = state.view === item[0];
+          var view = item[0];
+          var on = state.view === view || (view === 'library' && state.view === 'editor');
+          var action = view === 'wizard' ? 'start-wizard' : 'go';
           return '<button type="button" class="nav__item' + (on ? ' is-on' : '') + '" ' +
-            'data-action="go" data-value="' + attr(item[0]) + '"' +
-            (on ? ' aria-current="page"' : '') + '>' + esc(item[1]) + '</button>';
+            'data-action="' + action + '" data-value="' + attr(view) + '"' +
+            (on ? ' aria-current="page"' : '') + '>' + navIcon(item[2]) + '<span>' + esc(item[1]) + '</span></button>';
         }).join('') +
       '</nav>' +
       '<div class="who">' +
@@ -276,41 +310,61 @@
 
   function viewDashboard() {
     var lib = visibleLibrary();
-    var stats = [
-      { value: String(lib.length), label: 'Giáo án đã tạo' },
-      { value: String(state.pinned.length), label: 'Đã ghim' },
-      { value: String(currentSlides().length), label: 'Bài trình chiếu' },
-      /* Lượt AI là số liệu của máy chủ. Bản chạy trên máy không đếm được nên
-         để dấu gạch thay vì hiện một con số không có thật. */
-      { value: '—', label: 'Lượt AI còn lại hôm nay', title: 'Cần máy chủ để đếm lượt gọi AI' }
-    ];
+    var firstName = (D.user.name || '').trim().split(' ').slice(-1)[0];
+    var activeCfg = state.config.filter(function (c) { return c.status === 'Đang áp dụng'; })[0];
 
     return '<div class="wrap">' +
-      '<h1 class="h1 h1--dash">Hôm nay bạn muốn soạn giáo án gì?</h1>' +
-      '<div class="actions-3">' +
-        '<button type="button" class="action-card action-card--pink" data-action="start-wizard">' +
-          '<div class="action-card__title">Tạo giáo án mới</div>' +
-          '<div class="action-card__body">Wizard 5 bước, có gợi ý theo nhóm tuổi</div></button>' +
-        '<button type="button" class="action-card action-card--blue" data-action="go" data-value="upload">' +
-          '<div class="action-card__title">Tải Word lên</div>' +
-          '<div class="action-card__body">Đọc giáo án .docx có sẵn và chuyển thành slide</div></button>' +
-        '<button type="button" class="action-card action-card--green" data-action="go" data-value="ppt">' +
-          '<div class="action-card__title">Chuyển sang PowerPoint</div>' +
-          '<div class="action-card__body">Tóm tắt giáo án thành bài trình chiếu 16:9</div></button>' +
-      '</div>' +
-      '<div class="stats">' +
-        stats.map(function (s) {
-          return '<div class="stat"' + (s.title ? ' title="' + attr(s.title) + '"' : '') + '>' +
-            '<div class="stat__value">' + esc(s.value) + '</div>' +
-            '<div class="stat__label">' + esc(s.label) + '</div></div>';
-        }).join('') +
-      '</div>' +
-      '<div class="dash-cols">' +
+      '<div class="dash-top">' +
         '<div>' +
+          '<h1 class="h1 h1--dash" style="margin-bottom:4px">Chào cô ' + esc(firstName) + '!</h1>' +
+          '<div class="dash-top__sub">Hôm nay cô muốn soạn hoạt động nào?</div>' +
+        '</div>' +
+        '<div class="dash-top__right">' +
+          '<div class="config-pill"><span class="config-pill__dot"></span>' +
+          (activeCfg ? 'Đang áp dụng: ' + esc(activeCfg.code) : 'Chưa chọn văn bản áp dụng') + '</div>' +
+          '<button type="button" class="btn-cta-sm" data-action="start-wizard">Tạo giáo án mới</button>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="hero">' +
+        '<div class="hero__blob hero__blob--1"></div>' +
+        '<div class="hero__blob hero__blob--2"></div>' +
+        '<div class="hero__content">' +
+          '<div class="hero__kicker">APP TẠO GIÁO ÁN</div>' +
+          '<div class="hero__title">Trợ lý AI hỗ trợ giáo viên mầm non xây dựng giáo án khoa học, sáng tạo và ' +
+          'phù hợp từng độ tuổi.</div>' +
+          '<div class="hero__actions">' +
+            '<button type="button" class="hero__btn hero__btn--solid" data-action="start-wizard">Tạo giáo án mới</button>' +
+            '<button type="button" class="hero__btn hero__btn--ghost" data-action="go" data-value="library">Giáo án đã soạn</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="quick-grid">' +
+        '<button type="button" class="quick-card" data-action="start-wizard">' +
+          '<div class="quick-card__icon quick-card__icon--teal">' + navIcon('plus') + '</div>' +
+          '<div class="quick-card__title">Tạo giáo án mới</div>' +
+          '<div class="quick-card__body">Điền 5 bước, AI soạn bản đầu tiên.</div></button>' +
+        '<button type="button" class="quick-card" data-action="go" data-value="library">' +
+          '<div class="quick-card__icon quick-card__icon--blue">' + navIcon('bookmark') + '</div>' +
+          '<div class="quick-card__title">Giáo án đã lưu</div>' +
+          '<div class="quick-card__body">Tìm, lọc, nhân bản và chỉnh sửa.</div></button>' +
+        '<button type="button" class="quick-card" data-action="go" data-value="ppt">' +
+          '<div class="quick-card__icon quick-card__icon--amber">' + navIcon('monitor') + '</div>' +
+          '<div class="quick-card__title">Tạo PowerPoint</div>' +
+          '<div class="quick-card__body">Chuyển giáo án thành slide cho trẻ.</div></button>' +
+        '<button type="button" class="quick-card" data-action="go" data-value="upload">' +
+          '<div class="quick-card__icon quick-card__icon--teal">' + navIcon('wordArrow') + '</div>' +
+          '<div class="quick-card__title">Tải giáo án Word</div>' +
+          '<div class="quick-card__body">AI phân tích và tạo slide từ .docx.</div></button>' +
+      '</div>' +
+
+      '<div class="dash-cols">' +
+        '<div class="panel">' +
           '<div class="section-head"><h2 class="h2">Giáo án gần đây</h2>' +
           '<button type="button" class="btn--link" data-action="go" data-value="library">Xem tất cả</button></div>' +
           '<div class="stack-10">' +
-            lib.slice(0, 4).map(function (p) {
+            lib.slice(0, 5).map(function (p) {
               return '<button type="button" class="recent" data-action="go" data-value="editor">' +
                 '<div style="min-width:0"><div class="recent__title">' + esc(p.title) + '</div>' +
                 '<div class="recent__meta">' + esc(p.age + ' · ' + p.domain) + '</div></div>' +
@@ -318,14 +372,15 @@
             }).join('') +
           '</div>' +
         '</div>' +
-        '<div>' +
-          '<h2 class="list-title">Mẫu gợi ý cho lớp ghép</h2>' +
-          '<div class="stack-10">' +
-            D.suggested.map(function (t) {
-              return '<div class="suggest"><div class="suggest__age">' + esc(t.age) + '</div>' +
-                '<div class="suggest__title">' + esc(t.title) + '</div></div>';
-            }).join('') +
-          '</div>' +
+        '<div class="stats stats--2x2">' +
+          '<div class="stat"><div class="stat__label">Tổng giáo án</div>' +
+          '<div class="stat__value">' + lib.length + '</div></div>' +
+          '<div class="stat"><div class="stat__label">Đã ghim</div>' +
+          '<div class="stat__value">' + state.pinned.length + '</div></div>' +
+          '<div class="stat"><div class="stat__label">Bản PowerPoint</div>' +
+          '<div class="stat__value" style="color:var(--amber-ink)">' + currentSlides().length + '</div></div>' +
+          '<div class="stat"><div class="stat__label">Tài liệu đã tải lên</div>' +
+          '<div class="stat__value" style="color:var(--blue-ink)">' + state.uploadsCount + '</div></div>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -724,10 +779,10 @@
   function viewLibrary() {
     var items = filteredLibrary();
     return '<div class="wrap">' +
-      '<h1 class="h1">Giáo án của tôi</h1>' +
+      '<h1 class="h1">Giáo án đã lưu</h1>' +
       '<p class="lede">' + items.length + ' giáo án · ' + state.pinned.length + ' đã ghim</p>' +
       '<div class="lib-tools">' +
-        '<input id="lib-search" class="lib-search" type="search" data-search="1" ' +
+        '<input id="lib-search" class="lib-search" type="search" data-search="query" ' +
         'placeholder="Tìm theo tên giáo án" value="' + attr(state.query) + '">' +
         chips('libFilter', D.options.libFilters, true) +
       '</div>' +
@@ -754,21 +809,109 @@
     '</div>';
   }
 
-  /* ── Thư viện mẫu ────────────────────────────────────────────────────── */
+  /* ── Kho học liệu ────────────────────────────────────────────────────── */
 
-  function viewTemplates() {
+  function materialTypes() {
+    var out = [];
+    D.materials.concat(state.myMaterials).forEach(function (h) {
+      if (out.indexOf(h.loai) === -1) out.push(h.loai);
+    });
+    return out;
+  }
+
+  function filteredMaterials() {
+    var q = state.matQuery.toLowerCase().trim();
+    return D.materials.concat(state.myMaterials).filter(function (h) {
+      if (q && (h.ten + ' ' + h.noiDung).toLowerCase().indexOf(q) === -1) return false;
+      if (state.matAge && h.ages.indexOf(state.matAge) === -1) return false;
+      if (state.matType && h.loai !== state.matType) return false;
+      return true;
+    });
+  }
+
+  function viewMaterials() {
+    var list = filteredMaterials();
     return '<div class="wrap">' +
-      '<h1 class="h1">Thư viện mẫu</h1>' +
-      '<p class="lede">Mẫu có nội dung đầy đủ, dùng được ngay để kiểm thử xuất Word và PowerPoint.</p>' +
-      '<div class="tpl-grid">' +
-        D.templates.map(function (t, i) {
-          return '<div class="tpl"><div>' +
-            '<div class="tpl__age">' + esc(t[0]) + '</div>' +
-            '<div class="tpl__title">' + esc(t[1]) + '</div>' +
-            '<div class="tpl__domain">' + esc(t[2]) + '</div></div>' +
-            '<button type="button" class="btn-use" data-action="use-template" data-index="' + i + '">Dùng mẫu</button>' +
-          '</div>';
-        }).join('') +
+      '<h1 class="h1">Kho học liệu</h1>' +
+      '<p class="lede">Thơ, truyện, trò chơi, hoạt động STEAM và Montessori — chèn thẳng vào giáo án đang mở.</p>' +
+      '<div class="lib-tools">' +
+        '<input id="mat-search" class="lib-search" type="search" data-search="matQuery" ' +
+        'placeholder="Thơ, truyện, trò chơi…" value="' + attr(state.matQuery) + '">' +
+        '<select class="input" style="width:auto" data-mat-age="1">' +
+          '<option value="">Tất cả độ tuổi</option>' +
+          D.options.mixedAges.map(function (a) {
+            return '<option value="' + attr(a) + '"' + (state.matAge === a ? ' selected' : '') + '>' + esc(a) + '</option>';
+          }).join('') +
+        '</select>' +
+        '<select class="input" style="width:auto" data-mat-type="1">' +
+          '<option value="">Tất cả loại</option>' +
+          materialTypes().map(function (t) {
+            return '<option value="' + attr(t) + '"' + (state.matType === t ? ' selected' : '') + '>' + esc(t) + '</option>';
+          }).join('') +
+        '</select>' +
+        '<button type="button" class="btn-use" data-action="mat-add">Thêm học liệu</button>' +
+      '</div>' +
+      (list.length
+        ? '<div class="lib-grid">' + list.map(function (h) {
+            var fav = state.matFavs.indexOf(h.id) !== -1;
+            return '<div class="lib-card">' +
+              '<div class="lib-card__top"><span class="status-chip status-chip--ok">' + esc(h.loai) + '</span>' +
+              '<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">' +
+                h.ages.map(function (a) { return '<span class="status-chip">' + esc(a.replace('Trẻ ', '')) + '</span>'; }).join('') +
+              '</div></div>' +
+              '<div class="lib-card__title">' + esc(h.ten) + '</div>' +
+              '<div class="lib-card__domain">' + esc(h.noiDung) + '</div>' +
+              '<div class="lib-card__date">Nguồn: ' + esc(h.nguon) + '</div>' +
+              '<div class="lib-card__actions">' +
+                '<button type="button" class="btn-mini" data-action="mat-insert" data-value="' + attr(h.id) + '">Chèn vào giáo án</button>' +
+                '<button type="button" class="btn-mini' + (fav ? ' btn-mini--green' : '') + '" ' +
+                'data-action="mat-fav" data-value="' + attr(h.id) + '">' + (fav ? 'Đã lưu' : 'Lưu yêu thích') + '</button>' +
+              '</div></div>';
+          }).join('') + '</div>'
+        : '<div class="empty"><div class="empty__title">Không tìm thấy học liệu phù hợp</div>' +
+          '<div class="empty__body">Thử bỏ bộ lọc hoặc thêm học liệu của cô.</div></div>') +
+    '</div>';
+  }
+
+  /* ── Hồ sơ cá nhân ───────────────────────────────────────────────────── */
+
+  function viewProfile() {
+    var p = state.profile;
+    var pf = function (label, key, type) {
+      return '<label class="label"><span class="field-label">' + esc(label) + '</span>' +
+        '<input class="input" type="' + (type || 'text') + '" data-pfield="' + attr(key) + '" ' +
+        'value="' + attr(p[key]) + '"></label>';
+    };
+    return '<div class="wrap wrap--narrow">' +
+      '<h1 class="h1">Hồ sơ cá nhân</h1>' +
+      '<p class="lede">Thông tin hiển thị trên giáo án và file xuất ra.</p>' +
+      '<div class="card" style="display:flex;flex-direction:column;gap:22px;max-width:860px">' +
+        '<div class="grid-2">' +
+          pf('Họ tên', 'hoTen') +
+          '<label class="label"><span class="field-label">Tên đăng nhập</span>' +
+          '<input class="input" type="text" value="' + attr(p.username) + '" readonly ' +
+          'style="background:var(--surface-soft);color:var(--muted)"></label>' +
+          pf('Email', 'email', 'email') +
+          pf('Trường', 'truong') +
+          pf('Lớp', 'lop') +
+          pf('Tỉnh/thành phố', 'tinh') +
+          pf('Mẫu giáo án mặc định', 'mauMacDinh') +
+          pf('Chữ ký hiển thị trên giáo án', 'chuKy') +
+        '</div>' +
+        '<div>' +
+          '<div class="field-label" style="margin-bottom:10px">Nhóm tuổi thường dạy</div>' +
+          '<div class="chip-row">' +
+            D.options.mixedAges.map(function (a) {
+              var on = (p.nhomTuoi || []).indexOf(a) !== -1;
+              return '<button type="button" class="chip' + (on ? ' is-on' : '') + '" ' +
+                'data-action="pfield-toggle-age" data-value="' + attr(a) + '">' + esc(a) + '</button>';
+            }).join('') +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:10px">' +
+          '<button type="button" class="btn btn--pink" data-action="save-profile">Lưu hồ sơ</button>' +
+          '<button type="button" class="btn" data-action="change-password">Đổi mật khẩu</button>' +
+        '</div>' +
       '</div>' +
     '</div>';
   }
@@ -1037,90 +1180,54 @@
     '</div>';
   }
 
-  /* ── Căn cứ và tham chiếu ────────────────────────────────────────────── */
+  /* ── Cấu hình chương trình ─────────────────────────────────────────────
+     Gộp "Căn cứ và tham chiếu" và các công tắc tính năng của bản cũ — bản
+     thiết kế mới chỉ có một màn hình quản trị: danh mục văn bản chương
+     trình đơn vị đang áp dụng (sửa được trạng thái, thêm, xóa). */
 
-  function refChipClass(status) {
-    if (status === 'Đang có hiệu lực') return 'status-chip--ok';
-    if (status === 'Sắp có hiệu lực') return 'status-chip--soon';
-    if (status === 'Chưa xác minh') return '';
-    return 'status-chip--bad';
-  }
-
-  function viewRefs() {
-    return '<div class="wrap">' +
-      '<h1 class="h1">Căn cứ và tham chiếu</h1>' +
-      '<p class="refs-lede">Danh mục văn bản được lưu trong cơ sở dữ liệu và do quản trị viên cập nhật. ' +
-      'AI chỉ dẫn căn cứ pháp lý từ danh mục này, không tự bịa số hiệu hay điều khoản.</p>' +
+  function viewAdmin() {
+    return '<div class="wrap wrap--narrow">' +
+      '<h1 class="h1">Cấu hình chương trình</h1>' +
+      '<p class="lede">Văn bản chương trình mà đơn vị đang áp dụng. AI chỉ dẫn căn cứ pháp lý từ danh mục này, ' +
+      'không tự bịa số hiệu hay điều khoản.</p>' +
       '<div class="note-yellow" style="margin-bottom:22px">' + esc(D.disclaimer) + '</div>' +
-      '<div style="overflow-x:auto"><table class="table table--refs">' +
-        '<thead><tr>' +
-          '<th style="width:20%">Số hiệu</th><th>Tên văn bản</th>' +
-          '<th style="width:14%">Hiệu lực</th><th style="width:16%">Trạng thái</th>' +
-          '<th style="width:13%">Kiểm tra gần nhất</th>' +
+      '<div class="panel">' +
+        '<div style="overflow-x:auto"><table class="table table--refs"><thead><tr>' +
+          '<th style="width:26%">Văn bản / chương trình</th><th style="width:15%">Số hiệu</th>' +
+          '<th style="width:15%">Cơ quan</th><th style="width:11%">Hiệu lực</th>' +
+          '<th style="width:16%">Trạng thái</th><th style="width:11%">Kiểm tra gần nhất</th><th style="width:40px"></th>' +
         '</tr></thead><tbody>' +
-          D.refs.map(function (r) {
+          state.config.map(function (c, i) {
             return '<tr>' +
-              '<td class="code">' + esc(r[0]) + '</td>' +
-              '<td>' + esc(r[1]) + '<div class="issuer">' + esc(r[2]) + '</div></td>' +
-              '<td class="code">' + esc(r[3]) + '</td>' +
-              '<td><span class="status-chip ' + refChipClass(r[4]) + '">' + esc(r[4]) + '</span></td>' +
-              '<td class="checked">' + esc(r[5]) + '</td>' +
+              '<td>' + esc(c.name) + '</td>' +
+              '<td class="code">' + esc(c.code) + '</td>' +
+              '<td class="issuer">' + esc(c.org) + '</td>' +
+              '<td class="code">' + esc(c.effective) + '</td>' +
+              '<td><select class="input" style="height:36px;padding:0 9px;font-size:12.5px" data-config-row="' + i + '">' +
+                ['Đang áp dụng', 'Sắp áp dụng', 'Hết hiệu lực'].map(function (s) {
+                  return '<option value="' + s + '"' + (c.status === s ? ' selected' : '') + '>' + s + '</option>';
+                }).join('') +
+              '</select></td>' +
+              '<td class="checked">' + esc(c.checked) + '</td>' +
+              '<td><button type="button" class="icon-btn icon-btn--danger" title="Xóa" ' +
+              'data-action="config-del" data-value="' + i + '">✕</button></td>' +
             '</tr>';
           }).join('') +
         '</tbody></table></div>' +
-    '</div>';
-  }
-
-  /* ── Quản trị ────────────────────────────────────────────────────────── */
-
-  function viewAdmin() {
-    return '<div class="wrap">' +
-      '<h1 class="h1">Quản trị</h1>' +
-      '<p class="lede">Quyền quản trị viên. Giáo viên không sửa được văn bản pháp lý và prompt hệ thống.</p>' +
-      '<div class="stats">' +
-        D.adminStats.map(function (s) {
-          return '<div class="stat"><div class="stat__value stat__value--sm">' + esc(s.value) + '</div>' +
-            '<div class="stat__label">' + esc(s.label) + '</div></div>';
-        }).join('') +
+        '<button type="button" class="btn-use" style="margin-top:16px" data-action="config-add">Thêm văn bản</button>' +
       '</div>' +
-      '<div class="admin-cols">' +
-        '<div class="panel">' +
-          '<div class="panel__title">Người dùng</div>' +
-          '<div style="overflow-x:auto"><table class="users"><thead><tr>' +
-            '<th>Giáo viên</th><th>Trường</th><th>Vai trò</th><th>Lượt AI hôm nay</th>' +
-          '</tr></thead><tbody>' +
-            D.users.map(function (u) {
-              return '<tr><td class="name">' + esc(u[0]) + '</td>' +
-                '<td class="school">' + esc(u[1]) + '</td>' +
-                '<td><span class="status-chip ' + (u[2] === 'Quản trị viên' ? 'status-chip--admin' : '') + '">' +
-                esc(u[2]) + '</span></td>' +
-                '<td class="usage">' + esc(u[3]) + '</td></tr>';
-            }).join('') +
-          '</tbody></table></div>' +
-        '</div>' +
-        '<div style="display:grid;gap:16px;align-content:start">' +
-          '<div class="panel panel--sm">' +
-            '<div class="panel__title panel__title--sm">Prompt hệ thống</div>' +
-            '<div style="display:grid;gap:8px">' +
-              D.prompts.map(function (p) {
-                return '<div class="kv-row"><div>' + esc(p.name) + '</div>' +
-                  '<div class="kv-row__v">' + esc(p.version) + '</div></div>';
-              }).join('') +
-            '</div>' +
-          '</div>' +
-          '<div class="panel panel--sm">' +
-            '<div class="panel__title panel__title--sm">Giới hạn và tính năng</div>' +
-            '<div style="display:grid;gap:10px">' +
-              D.toggles.map(function (t) {
-                var on = !!state.adminToggles[t[1]];
-                return '<div class="toggle-row"><div class="toggle-row__label">' + esc(t[0]) + '</div>' +
-                  '<button type="button" class="switch' + (on ? ' is-on' : '') + '" ' +
-                  'data-action="admin-toggle" data-value="' + attr(t[1]) + '" role="switch" ' +
-                  'aria-checked="' + on + '" aria-label="' + attr(t[0]) + '">' +
-                  '<div class="switch__knob"></div></button></div>';
-              }).join('') +
-            '</div>' +
-          '</div>' +
+      '<div class="rule"></div>' +
+      '<div class="panel panel--sm" style="max-width:420px">' +
+        '<div class="panel__title panel__title--sm">Giới hạn và tính năng</div>' +
+        '<div style="display:grid;gap:10px">' +
+          D.toggles.map(function (t) {
+            var on = !!state.adminToggles[t[1]];
+            return '<div class="toggle-row"><div class="toggle-row__label">' + esc(t[0]) + '</div>' +
+              '<button type="button" class="switch' + (on ? ' is-on' : '') + '" ' +
+              'data-action="admin-toggle" data-value="' + attr(t[1]) + '" role="switch" ' +
+              'aria-checked="' + on + '" aria-label="' + attr(t[0]) + '">' +
+              '<div class="switch__knob"></div></button></div>';
+          }).join('') +
         '</div>' +
       '</div>' +
     '</div>';
@@ -1130,8 +1237,8 @@
 
   var SCREENS = {
     dashboard: viewDashboard, wizard: viewWizard, editor: viewEditor,
-    library: viewLibrary, templates: viewTemplates, upload: viewUpload,
-    word: viewWord, ppt: viewPpt, refs: viewRefs, admin: viewAdmin
+    library: viewLibrary, upload: viewUpload, word: viewWord, ppt: viewPpt,
+    materials: viewMaterials, profile: viewProfile, admin: viewAdmin
   };
 
   function render() {
@@ -1280,6 +1387,7 @@
       state.upResult = result;
       state.upload = 'mapped';
       state.upFileLabel = result.file.name + ' · ' + result.file.sizeLabel;
+      state.uploadsCount += 1;
       render();
       flash('Đã đọc ' + result.file.name + ' — ' + result.stats.activities + ' hoạt động');
     }).catch(function (err) {
@@ -1360,28 +1468,65 @@
       flash('Đã chuyển "' + (item ? item.title : '') + '" vào thùng rác. Có thể khôi phục trong 30 ngày.');
     },
 
-    'use-template': function (el) {
-      var t = D.templates[Number(el.getAttribute('data-index'))];
-      if (!t) return;
-      /* Dùng mẫu = điền wizard theo mẫu rồi dựng giáo án, không mở giáo án của mẫu khác. */
-      state.form.activity = t[1];
-      state.domains = [t[2].indexOf('Phát triển') === 0 ? t[2] : 'Phát triển đa lĩnh vực'];
-      if (t[2].indexOf('Phát triển') !== 0) state.types = [t[2]];
-      state.mixed = t[0] === 'LỚP GHÉP';
-      if (!state.mixed) {
-        var age = 'Trẻ ' + t[0].toLowerCase();
-        state.ages = D.options.ages.indexOf(age) !== -1 ? [age] : ['Trẻ 4–5 tuổi'];
-      } else {
-        state.ages = ['Lớp ghép nhiều độ tuổi'];
-      }
-      state.lesson = C.composeLesson(state);
-      state.lessonSource = 'local';
-      state.aiError = null;
-      state.versions = [];
-      stamp('Mở mẫu "' + t[1] + '"');
-      state.view = 'editor';
-      flash('Đã mở mẫu "' + t[1] + '" để chỉnh sửa');
-      window.scrollTo(0, 0);
+    /* Kho học liệu. */
+    'mat-fav': function (el) {
+      var id = el.getAttribute('data-value');
+      state.matFavs = state.matFavs.indexOf(id) !== -1
+        ? state.matFavs.filter(function (x) { return x !== id; })
+        : state.matFavs.concat([id]);
+      render();
+    },
+    'mat-insert': function (el) {
+      var id = el.getAttribute('data-value');
+      var item = D.materials.concat(state.myMaterials).filter(function (h) { return h.id === id; })[0];
+      if (!item) return;
+      editLesson(function (L) {
+        L.prep.materials = (L.prep.materials || []).concat([
+          item.loai + ': ' + item.ten + (item.nguon ? ' (' + item.nguon + ')' : '')
+        ]);
+      }, 'Chèn học liệu');
+      flash('Đã chèn "' + item.ten + '" vào phần học liệu và thiết bị của giáo án đang mở.');
+    },
+    'mat-add': function () {
+      var ten = prompt('Tên học liệu'); if (!ten) return;
+      var loai = prompt('Loại học liệu (Thơ, Câu chuyện, Trò chơi, Câu đố...)', 'Trò chơi') || 'Khác';
+      var noiDung = prompt('Mô tả ngắn') || '';
+      var nguon = prompt('Nguồn hoặc tác giả (nếu có)') || 'Giáo viên cung cấp';
+      state.myMaterials = state.myMaterials.concat([
+        { id: 'my' + Date.now(), loai: loai, ten: ten, ages: [], noiDung: noiDung, nguon: nguon }
+      ]);
+      flash('Đã thêm học liệu của cô.');
+    },
+
+    /* Hồ sơ cá nhân. */
+    'pfield-toggle-age': function (el) {
+      var v = el.getAttribute('data-value');
+      var list = state.profile.nhomTuoi || [];
+      state.profile.nhomTuoi = list.indexOf(v) !== -1
+        ? list.filter(function (x) { return x !== v; })
+        : list.concat([v]);
+      render();
+    },
+    'save-profile': function () { flash('Đã lưu hồ sơ.'); },
+    'change-password': function () {
+      flash('Đổi mật khẩu sẽ dùng hệ thống xác thực của trường. Bản dùng thử chưa bật chức năng này.');
+    },
+
+    /* Cấu hình chương trình. */
+    'config-del': function (el) {
+      var i = Number(el.getAttribute('data-value'));
+      state.config = state.config.filter(function (_, j) { return j !== i; });
+      render();
+    },
+    'config-add': function () {
+      var ten = prompt('Tên văn bản hoặc chương trình'); if (!ten) return;
+      var so = prompt('Số hiệu', '') || '';
+      var org = prompt('Cơ quan ban hành', 'Bộ Giáo dục và Đào tạo') || '';
+      var eff = prompt('Ngày hiệu lực', '') || '';
+      state.config = state.config.concat([
+        { code: so, name: ten, org: org, effective: eff, status: 'Sắp áp dụng', checked: new Date().toLocaleDateString('vi-VN') }
+      ]);
+      flash('Đã thêm văn bản vào cấu hình.');
     },
 
     'pick-file': pickFile,
@@ -1462,8 +1607,14 @@
       state.loginForm[loginKey] = el.value;
       return;
     }
-    if (el.getAttribute && el.getAttribute('data-search')) {
-      state.query = el.value;
+    var pkey = el.getAttribute && el.getAttribute('data-pfield');
+    if (pkey) {
+      state.profile[pkey] = el.value;
+      return;
+    }
+    var searchKey = el.getAttribute && el.getAttribute('data-search');
+    if (searchKey) {
+      state[searchKey] = el.value;
       state.focusId = el.id;
       render();
     }
@@ -1476,16 +1627,32 @@
     }
   });
 
-  /* Cột "Ánh xạ thành" ở bảng nhận dạng file Word. */
+  /* Cột "Ánh xạ thành" ở bảng nhận dạng file Word; trạng thái văn bản ở Cấu
+     hình chương trình; hai bộ lọc ở Kho học liệu. */
   document.addEventListener('change', function (e) {
     var el = e.target;
-    var idx = el.getAttribute && el.getAttribute('data-map-row');
-    if (idx == null || !state.upResult) return;
-    var row = state.upResult.rows[Number(idx)];
-    if (!row) return;
-    row.target = el.value;
-    row.conf = el.value === 'Chưa xác định' ? 'Thấp' : 'Đã sửa';
-    render();
+    if (!el.getAttribute) return;
+
+    var idx = el.getAttribute('data-map-row');
+    if (idx != null && state.upResult) {
+      var row = state.upResult.rows[Number(idx)];
+      if (row) {
+        row.target = el.value;
+        row.conf = el.value === 'Chưa xác định' ? 'Thấp' : 'Đã sửa';
+        render();
+      }
+      return;
+    }
+
+    var cfgIdx = el.getAttribute('data-config-row');
+    if (cfgIdx != null && state.config[Number(cfgIdx)]) {
+      state.config[Number(cfgIdx)].status = el.value;
+      render();
+      return;
+    }
+
+    if (el.getAttribute('data-mat-age') != null) { state.matAge = el.value; render(); return; }
+    if (el.getAttribute('data-mat-type') != null) { state.matType = el.value; render(); return; }
   });
 
   /* Sửa trực tiếp trong trình soạn thảo — đọc lại khi rời khỏi ô. */

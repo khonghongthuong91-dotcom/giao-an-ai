@@ -208,24 +208,18 @@
       { n: '5', title: 'Kiểm tra chuyên môn', body: 'Cảnh báo an toàn, quá tải, thời lượng và phân hóa trước khi dùng.' }
     ],
 
-    /* Thanh điều hướng: [mã màn hình, nhãn]. */
+    /* Thanh điều hướng: [mã màn hình, nhãn, tên icon]. Màn Trình soạn thảo và
+       Xem trước Word vẫn có thật, chỉ không còn nằm ở thanh bên — mở từ nút
+       trong Giáo án đã lưu / trình soạn thảo, theo đúng bản thiết kế mới. */
     nav: [
-      ['dashboard', 'Trang chủ'],
-      ['wizard', 'Tạo giáo án'],
-      ['editor', 'Trình soạn thảo'],
-      ['library', 'Giáo án của tôi'],
-      ['templates', 'Thư viện mẫu'],
-      ['upload', 'Tải Word lên'],
-      ['word', 'Xem trước Word'],
-      ['ppt', 'Xem trước PowerPoint'],
-      ['refs', 'Căn cứ và tham chiếu'],
-      ['admin', 'Quản trị']
-    ],
-
-    suggested: [
-      { age: 'LỚP GHÉP', title: 'Hoạt động trải nghiệm chăm sóc cây' },
-      { age: '3–4 & 4–5 TUỔI', title: 'Con có quyền được lắng nghe' },
-      { age: 'LỚP GHÉP', title: 'Khám phá màu sắc theo nhóm nhỏ' }
+      ['dashboard', 'Trang chủ', 'home'],
+      ['wizard', 'Tạo giáo án', 'plus'],
+      ['library', 'Giáo án đã lưu', 'bookmark'],
+      ['ppt', 'Tạo PowerPoint', 'monitor'],
+      ['upload', 'Word sang PowerPoint', 'wordArrow'],
+      ['materials', 'Kho học liệu', 'books'],
+      ['profile', 'Hồ sơ cá nhân', 'user'],
+      ['admin', 'Cấu hình chương trình', 'sliders']
     ],
 
     /* Nhãn 5 bước của wizard. */
@@ -295,18 +289,46 @@
       { id: 'p6', title: 'Sử dụng thiết bị cùng người lớn', age: '5–6 TUỔI', domain: 'Đa lĩnh vực', theme: 'Năng lực số', date: '26/08/2026' }
     ],
 
-    /* Thư viện mẫu: [nhóm tuổi, tên, lĩnh vực]. */
-    templates: [
-      ['18–24 THÁNG', 'Nhận biết quả bóng', 'Phát triển nhận thức'],
-      ['24–36 THÁNG', 'Kể chuyện về con vật', 'Phát triển ngôn ngữ'],
-      ['3–4 TUỔI', 'Khám phá màu sắc', 'Phát triển thẩm mỹ'],
-      ['4–5 TUỔI', 'STEAM: làm cầu cho ô tô đồ chơi', 'Phát triển đa lĩnh vực'],
-      ['5–6 TUỔI', 'Khám phá vòng đời của cây', 'Phát triển nhận thức'],
-      ['LỚP GHÉP', 'Hoạt động trải nghiệm chăm sóc cây', 'Phát triển đa lĩnh vực'],
-      ['4–5 TUỔI', 'Khi con tức giận', 'Giáo dục cảm xúc'],
-      ['4–5 TUỔI', 'Không đi theo người lạ', 'An toàn và phòng tránh'],
-      ['5–6 TUỔI', 'Con có quyền được lắng nghe', 'Quyền trẻ em'],
-      ['5–6 TUỔI', 'Sử dụng thiết bị cùng người lớn', 'Năng lực số']
+    /* Hồ sơ cá nhân mặc định — giáo viên tự sửa ở màn Hồ sơ cá nhân. */
+    profileDefault: {
+      hoTen: 'Khổng Hồng Thương', username: 'giaovien', email: '',
+      truong: 'MN Phúc Than', lop: 'Lớp ghép Hoa Cúc', tinh: '',
+      nhomTuoi: ['Trẻ 3–4 tuổi', 'Trẻ 4–5 tuổi'], mauMacDinh: 'Giáo án hoạt động học', chuKy: 'Khổng Hồng Thương'
+    },
+
+    /* Kho học liệu: đoạn thơ, chuyện, trò chơi, hoạt động STEAM/Montessori có
+       thể chèn thẳng vào phần "Học liệu và thiết bị" của giáo án đang mở. */
+    materials: [
+      { id: 'hl1', loai: 'Thơ', ten: 'Cây bắp cải', ages: ['Trẻ 3–4 tuổi', 'Trẻ 4–5 tuổi'],
+        noiDung: 'Bài thơ ngắn về hình dáng lá bắp cải, dùng khi làm quen văn học chủ đề Thực vật. Giáo viên tự chuẩn bị văn bản gốc.',
+        nguon: 'Giáo viên cung cấp' },
+      { id: 'hl2', loai: 'Câu chuyện', ten: 'Hạt đỗ nhỏ tìm ánh nắng', ages: ['Trẻ 3–4 tuổi', 'Trẻ 4–5 tuổi', 'Trẻ 5–6 tuổi'],
+        noiDung: 'Truyện kể 6 câu về hạt đỗ nảy mầm, dùng để gây hứng thú cho hoạt động gieo hạt.',
+        nguon: 'Biên soạn nội bộ' },
+      { id: 'hl3', loai: 'Trò chơi', ten: 'Tìm lá cho cây', ages: ['Trẻ 24–36 tháng', 'Trẻ 3–4 tuổi'],
+        noiDung: 'Trẻ ghép lá rời vào thân cây đúng màu, chơi theo nhóm 4 trẻ, 5 phút.',
+        nguon: 'Biên soạn nội bộ' },
+      { id: 'hl4', loai: 'Hoạt động STEAM', ten: 'Thiết kế chậu trồng cây từ vật liệu tái sử dụng', ages: ['Trẻ 4–5 tuổi', 'Trẻ 5–6 tuổi'],
+        noiDung: 'Quy trình EDP 7 bước, vật liệu: chai nhựa cắt sẵn, dây, đất, hạt giống.',
+        nguon: 'Biên soạn nội bộ' },
+      { id: 'hl5', loai: 'Hoạt động Montessori', ten: 'Rót nước bằng bình nhỏ', ages: ['Trẻ 24–36 tháng', 'Trẻ 3–4 tuổi'],
+        noiDung: 'Bài học thực hành cuộc sống, có kiểm soát lỗi bằng khay và khăn thấm.',
+        nguon: 'Biên soạn nội bộ' },
+      { id: 'hl6', loai: 'Hoạt động cảm xúc', ten: 'Hộp bình tĩnh', ages: ['Trẻ 4–5 tuổi', 'Trẻ 5–6 tuổi'],
+        noiDung: 'Trẻ chọn một vật trong hộp khi tức giận: bóng bóp, chai bi lắc, thẻ hít thở.',
+        nguon: 'Biên soạn nội bộ' },
+      { id: 'hl7', loai: 'Tình huống an toàn', ten: 'Khi con thấy phích nước nóng', ages: ['Trẻ 3–4 tuổi', 'Trẻ 4–5 tuổi', 'Trẻ 5–6 tuổi'],
+        noiDung: 'Tình huống tranh 3 bước: nhận biết – lùi lại – gọi người lớn.',
+        nguon: 'Biên soạn nội bộ' },
+      { id: 'hl8', loai: 'Câu đố', ten: 'Đố về các loại quả', ages: ['Trẻ 4–5 tuổi', 'Trẻ 5–6 tuổi'],
+        noiDung: '6 câu đố ngắn về chuối, cam, dưa hấu, na, xoài, thanh long.',
+        nguon: 'Biên soạn nội bộ' },
+      { id: 'hl9', loai: 'Bài hát', ten: 'Em yêu cây xanh', ages: ['Trẻ 3–4 tuổi', 'Trẻ 4–5 tuổi'],
+        noiDung: 'Dùng cho phần vận động theo nhạc. Giáo viên kiểm tra lại tên tác giả trước khi in vào giáo án.',
+        nguon: 'Cần kiểm tra' },
+      { id: 'hl10', loai: 'Hoạt động trải nghiệm', ten: 'Đi thăm vườn rau của trường', ages: ['Trẻ 3–4 tuổi', 'Trẻ 4–5 tuổi', 'Trẻ 5–6 tuổi'],
+        noiDung: 'Trải nghiệm ngoài trời 25 phút, có phiếu quan sát bằng hình cho trẻ.',
+        nguon: 'Biên soạn nội bộ' }
     ],
 
     /*
@@ -344,29 +366,6 @@
       ['02/2025/TT-BGDĐT', 'Khung năng lực số cho người học', 'Bộ Giáo dục và Đào tạo', '2025', 'Đang có hiệu lực', '01/08/2026'],
       ['18/2026/TT-BGDĐT', 'Khung năng lực số cho giáo viên và cán bộ quản lý', 'Bộ Giáo dục và Đào tạo', '2026', 'Chưa xác minh', '01/08/2026'],
       ['51/2026/TT-BGDĐT', 'Quản trị viên cần nhập đúng ngày có hiệu lực', 'Bộ Giáo dục và Đào tạo', 'Chờ nhập', 'Sắp có hiệu lực', '01/08/2026']
-    ],
-
-    adminStats: [
-      { value: '126', label: 'Giáo viên' },
-      { value: '1.842', label: 'Giáo án' },
-      { value: '318', label: 'Lượt AI tuần này' },
-      { value: '7', label: 'Mẫu hệ thống' }
-    ],
-
-    /* Người dùng: [tên, trường, vai trò, lượt AI hôm nay]. */
-    users: [
-      ['Nguyễn Hồng Thương', 'MN Hoa Sen', 'Giáo viên', '5/8'],
-      ['Trần Thu Hà', 'MN Hoa Sen', 'Giáo viên', '2/8'],
-      ['Lê Minh Anh', 'MN Ánh Dương', 'Quản trị viên', '1/50'],
-      ['Phạm Bảo Ngọc', 'MN Sao Mai', 'Giáo viên', '8/8'],
-      ['Đỗ Thanh Vân', 'MN Ánh Dương', 'Giáo viên', '0/8']
-    ],
-
-    prompts: [
-      { name: 'Tạo giáo án', version: 'v4.2' },
-      { name: 'Kiểm tra chuyên môn', version: 'v2.0' },
-      { name: 'Tóm tắt sang slide', version: 'v1.8' },
-      { name: 'Phân tích file Word', version: 'v1.3' }
     ],
 
     /* Giới hạn và tính năng: [nhãn, khóa trong state.adminToggles]. */
