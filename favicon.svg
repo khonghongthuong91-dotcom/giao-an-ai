@@ -1,0 +1,26 @@
+<!--
+  Favicon: đúng bông hoa của app, xem flowerMark() trong js/app.js.
+  Nền bo góc dùng màu chủ đạo #18BFA7, giống ô logo ở sidebar.
+  Cánh hoa màu trắng nên BẮT BUỘC phải có nền; để trong suốt là mất hình.
+  Hoa gốc vẽ trong khung 24x24, translate(4 4) đưa vào giữa khung 32x32.
+
+  LƯU Ý: chú thích XML không được chứa hai dấu gạch ngang liền nhau. Bản đầu
+  tiên viết tên biến CSS kèm hai gạch ở đây, thế là cả file sai cú pháp XML và
+  trình duyệt bỏ qua favicon, hiện icon quả địa cầu mặc định.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="8" fill="#18BFA7"/>
+  <g transform="translate(4 4)">
+    <ellipse cx="12" cy="5.4" rx="3.3" ry="4.8" fill="#fff"/>
+    <ellipse cx="12" cy="5.4" rx="3.3" ry="4.8" fill="#fff" transform="rotate(60 12 12)"/>
+    <ellipse cx="12" cy="5.4" rx="3.3" ry="4.8" fill="#fff" transform="rotate(120 12 12)"/>
+    <ellipse cx="12" cy="5.4" rx="3.3" ry="4.8" fill="#fff" transform="rotate(180 12 12)"/>
+    <ellipse cx="12" cy="5.4" rx="3.3" ry="4.8" fill="#fff" transform="rotate(240 12 12)"/>
+    <ellipse cx="12" cy="5.4" rx="3.3" ry="4.8" fill="#fff" transform="rotate(300 12 12)"/>
+    <circle cx="12" cy="12" r="4.4" fill="#F8C85E"/>
+    <circle cx="10.3" cy="11.2" r="0.55" fill="#6B5836"/>
+    <circle cx="13.7" cy="11.2" r="0.55" fill="#6B5836"/>
+    <path d="M10.3 13c.45.6 1.1.95 1.7.95s1.25-.35 1.7-.95" stroke="#6B5836"
+          stroke-width="0.6" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>

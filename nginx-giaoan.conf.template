@@ -1,0 +1,77 @@
+# Reverse proxy cho APP Tạo Giáo Án.
+#
+# Theo đúng mẫu của quanlyhocvien.workzone.ai.vn trên cùng máy này:
+#   - Có CẢ block 80 và 443. Thiếu block 443 thì nginx rơi vào default_server
+#     (app academy) và tên miền này trả về sai app.
+#   - location acme-challenge nằm ở cả hai block, vì nếu đứng sau Cloudflare
+#     với "Always Use HTTPS" thì thử thách HTTP-01 bị chuyển sang 443.
+#     Gia hạn cert tự động dựa vào đó — đừng xoá.
+#       sudo certbot certonly --webroot -w /var/www/certbot -d __DOMAIN__
+#
+# __DOMAIN__ và __PORT__ được deploy-vps.sh thay bằng giá trị thật.
+
+# Giới hạn nhịp gọi AI: mỗi lần /api/generate là một lần gọi model có tính tiền
+# (trần $2.5/lần). Khai báo ở scope http qua conf.d, xem deploy-vps.sh.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __DOMAIN__;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name __DOMAIN__;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Không còn auth_basic ở đây: app tự xác thực bằng form đăng nhập và cookie
+    # phiên (xem auth.mjs). /api/generate tự kiểm tra phiên, nên gọi thẳng
+    # endpoint mà không đăng nhập vẫn bị chặn.
+
+    # Giáo viên tải file .docx lên để chuyển thành PowerPoint.
+    client_max_body_size 25M;
+
+    location / {
+        proxy_pass http://127.0.0.1:__PORT__;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Soạn một giáo án đầy đủ từng mất khoảng 2 phút; timeout phải rộng hơn
+    # hẳn, và phải khớp với trần 4 phút trong ai-server.mjs.
+    location /api/generate {
+        limit_req zone=giaoan_ai burst=3 nodelay;
+        limit_req_status 429;
+
+        proxy_pass http://127.0.0.1:__PORT__;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_buffering off;
+    }
+
+    ssl_certificate /etc/letsencrypt/live/__DOMAIN__/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+}

@@ -448,6 +448,12 @@
       body: JSON.stringify({ prompt: prompt, schema: schema || null })
     }).then(function (res) {
       return res.json().catch(function () { return null; }).then(function (data) {
+        /* Phiên hết hạn giữa chừng. Báo cho app đưa cô về màn hình đăng nhập,
+           thay vì hiện "máy chủ AI trả về lỗi (401)" chẳng ai hiểu. */
+        if (res.status === 401) {
+          if (window.COMPOSE && window.COMPOSE.onUnauthorized) window.COMPOSE.onUnauthorized();
+          throw new Error('phiên đăng nhập đã hết hạn');
+        }
         if (!res.ok || !data) throw new Error('máy chủ AI trả về lỗi (' + res.status + ')');
         if (!data.ok) throw new Error(data.error || 'lỗi không rõ từ máy chủ AI');
         return data.text;
@@ -1115,6 +1121,7 @@
     isAiReady: aiReachable,
     checkLocalAi: checkLocalAi,
     onAiStatusChange: null,
+    onUnauthorized: null,   /* app.js gán vào để đá về màn hình đăng nhập */
     checks: checks,
     slides: slides,
     review: review,

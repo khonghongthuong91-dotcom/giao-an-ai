@@ -1,0 +1,44 @@
+# Triển khai APP Tạo Giáo Án trên VPS.
+#
+# Cổng chỉ mở trên 127.0.0.1 — nginx trên máy chủ là thứ duy nhất chạm tới,
+# đúng khuôn mẫu các app khác đang chạy trên máy này. Không bao giờ bind
+# 0.0.0.0: /api/generate gọi model thật và mỗi lần gọi là tiền.
+services:
+  giaoan:
+    build:
+      context: .
+      args:
+        BUILD_ID: "${BUILD_ID:-dev}"
+        BUILT_AT: "${BUILT_AT:-}"
+    image: giaoan-ai:latest
+    container_name: giaoan-ai
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${HOST_PORT:-3060}:8787"
+    environment:
+      # Để trống thì entrypoint quay sang dùng thư mục ~/.claude mount bên dưới.
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+
+      # Tài khoản chung cho cả trường. Mật khẩu lưu dạng băm scrypt, không để
+      # thô. Đổi mật khẩu:
+      #   node ai-server.mjs --hash 'mat-khau-moi'
+      # rồi dán kết quả vào AUTH_PASS_HASH và `docker compose up -d`.
+      # Đổi mật khẩu cũng làm mọi phiên đang đăng nhập mất hiệu lực, vì khoá ký
+      # cookie dẫn xuất từ chính chuỗi băm này.
+      AUTH_USER: "${AUTH_USER:-giaoan}"
+      AUTH_PASS_HASH: "${AUTH_PASS_HASH:-}"
+    volumes:
+      # Chỉ-đọc: container chép ra chỗ riêng, không bao giờ sửa được thông tin
+      # đăng nhập của máy chủ.
+      - ${HOME}/.claude:/host-claude:ro
+      - ${HOME}/.claude.json:/host-claude.json:ro
+    # Cầu nối chỉ nhận chữ vào và trả chữ ra. Không cần thêm quyền gì.
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    cpus: 1.5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

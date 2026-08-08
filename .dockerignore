@@ -1,0 +1,12 @@
+.git
+.gitignore
+.ai-cwd
+*.env
+README.md
+ai-server.ps1
+chay-voi-ai.bat
+__test.docx
+*.crdownload
+nginx-giaoan.conf
+deploy-vps.sh
+tasks

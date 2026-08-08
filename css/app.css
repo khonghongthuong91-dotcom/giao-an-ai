@@ -389,7 +389,9 @@ a:hover { color: var(--pink); text-decoration: underline; }
 .shell { display: flex; min-height: 100vh; align-items: stretch; }
 
 .sidebar {
-  width: 252px;
+  /* 276px chứ không phải 252px: cần thêm chỗ cho nhãn phiên bản nằm cùng dòng
+     với tên app mà không cắt cụt tên. */
+  width: 276px;
   flex: none;
   background: var(--surface);
   border-right: 1px solid var(--line);
@@ -415,7 +417,41 @@ a:hover { color: var(--pink); text-decoration: underline; }
   flex: none;
 }
 
-.sidebar__name { font-size: 14px; font-weight: 700; line-height: 1.2; }
+/* 13px chứ không phải 14px: nhường chỗ cho nhãn phiên bản bên cạnh. */
+.sidebar__name { font-size: 13px; font-weight: 700; line-height: 1.2; }
+
+/* Tên app và nhãn phiên bản trên cùng một dòng. Thanh bên hẹp nên tên được
+   phép co lại và cắt bớt, còn nhãn giữ nguyên — nhãn mà xuống dòng thì trông
+   như một mục riêng chứ không còn là nhãn của tên nữa. */
+.sidebar__nameline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.sidebar__nameline .sidebar__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Nhãn phiên bản cạnh tên app — để đối chiếu localhost với production. */
+.vtag {
+  flex: none;
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--green-tint-2);
+  color: var(--green-ink-2);
+  border: 1px solid var(--green-line);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: default;
+}
 .sidebar__sub { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.3; }
 
 .nav { display: flex; flex-direction: column; gap: 3px; }
@@ -493,7 +529,11 @@ a:hover { color: var(--pink); text-decoration: underline; }
 .logout:hover { color: var(--pink-strong); }
 
 .main { flex: 1; min-width: 0; padding: 28px 36px 64px; }
-.wrap { max-width: 1180px; }
+
+/* Trang chủ và thư viện dùng hết bề ngang màn hình. Các màn nhiều chữ vẫn giữ
+   bề ngang hẹp bên dưới — dòng chữ dài quá 100 ký tự là mắt khó dò về đầu dòng
+   tiếp theo. Hai biến thể này đặt SAU .wrap nên vẫn thắng. */
+.wrap { max-width: none; }
 .wrap--narrow { max-width: 940px; }
 .wrap--word { max-width: 1120px; }
 
@@ -604,9 +644,18 @@ a:hover { color: var(--pink); text-decoration: underline; }
 .quick-card__title { margin-top: 16px; font-size: 15.5px; font-weight: 600; }
 .quick-card__body { margin-top: 6px; font-size: 13px; color: var(--muted); line-height: 1.55; }
 
-.stats--2x2 { grid-template-columns: repeat(2, 1fr); margin-bottom: 0; }
-
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+
+/* PHẢI đặt sau .stats: cùng độ ưu tiên (một class), nên luật đứng sau mới
+   thắng. Trước đây khối này nằm trên .stats nên bị đè hoàn toàn — 4 ô thống kê
+   dàn thành một hàng thay vì lưới 2x2.
+   align-content: start giữ ô cao đúng nội dung; nếu không, lưới bị kéo giãn
+   cho bằng chiều cao cột "Giáo án gần đây" bên cạnh. */
+.stats--2x2 {
+  grid-template-columns: repeat(2, 1fr);
+  align-content: start;
+  margin-bottom: 0;
+}
 
 .stat {
   background: var(--surface);
@@ -771,6 +820,38 @@ a:hover { color: var(--pink); text-decoration: underline; }
 .btn-generate:disabled { background: var(--pink-line); cursor: default; }
 
 .generate-note { font-size: 13px; color: var(--muted); line-height: 1.5; max-width: 42ch; }
+
+/* Thanh chờ AI. Tiến độ là ước lượng theo thời gian, không phải tiến độ thật —
+   xem generate() trong js/app.js. */
+.genbar { margin-top: 20px; }
+
+.genbar__track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--green-tint-2);
+  overflow: hidden;
+}
+
+.genbar__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--green), var(--green-strong));
+  /* Khớp với nhịp cập nhật 500ms của genTick() để thanh trôi đều, không giật. */
+  transition: width .5s linear;
+}
+
+.genbar__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.genbar__stage { color: var(--ink-2); font-weight: 500; }
+.genbar__time { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.genbar__hint { margin-top: 6px; font-size: 12.5px; color: var(--muted-2); line-height: 1.5; }
 
 .wizard-foot { display: flex; justify-content: space-between; margin-top: 22px; }
 

@@ -28,9 +28,11 @@
     view: startView,
     step: 1,
 
-    /* Đăng nhập minh họa — không nối tài khoản thật, xem README. */
+    /* Đăng nhập thật, kiểm tra ở máy chủ — xem auth.mjs và
+       docs/superpowers/specs/2026-08-08-dang-nhap-that-design.md. */
     loginForm: { username: '', password: '' },
     loginError: null,
+    loginBusy: false,
 
     /* Lựa chọn trong wizard — giá trị mặc định lấy từ bản thiết kế. */
     mixed: true,
@@ -67,6 +69,14 @@
     lesson: D.sampleLesson(),
     lessonSource: 'sample',
     generating: false,
+    /* Phiên bản do máy chủ trả về, xem versionTag(). */
+    version: null,
+    /* Thanh chờ AI — tiến độ ước lượng theo thời gian, xem generate(). */
+    genStartedAt: 0,
+    genPct: 0,
+    genSec: 0,
+    genStage: '',
+    _genTimer: null,
     aiError: null,
     aiPreview: null,
 
@@ -250,11 +260,11 @@
             (state.loginError ? '<div class="login__error">' + esc(state.loginError) + '</div>' : '') +
             '<button type="button" class="btn btn--pink" ' +
             'style="align-self:flex-start; font-size:16px; padding:14px 26px" ' +
-            'data-action="login">Đăng nhập</button>' +
+            (state.loginBusy ? 'disabled ' : '') +
+            'data-action="login">' + (state.loginBusy ? 'Đang kiểm tra…' : 'Đăng nhập') + '</button>' +
           '</div>' +
-          '<div class="login__fine">Đây là màn hình đăng nhập minh họa — nhập tên đăng nhập và mật khẩu bất kỳ ' +
-          'là vào được, chưa nối với hệ thống tài khoản thật. Ứng dụng không thu thập tên thật, hình ảnh hay ' +
-          'thông tin định danh của trẻ.</div>' +
+          '<div class="login__fine">Cả trường dùng chung một tài khoản — hỏi người phụ trách để lấy mật khẩu. ' +
+          'Ứng dụng không thu thập tên thật, hình ảnh hay thông tin định danh của trẻ.</div>' +
         '</div>' +
       '</div>' +
       '<div class="login__right">' +
@@ -272,12 +282,30 @@
 
   /* ── Thanh bên ───────────────────────────────────────────────────────── */
 
+  /*
+    Nhãn phiên bản cạnh logo, để đối chiếu localhost với production sau mỗi lần
+    deploy. Số lấy từ /api/version của CHÍNH máy chủ đang phục vụ trang này —
+    không nhúng cứng vào JS, vì JS bị trình duyệt giữ trong cache thì nhãn sẽ
+    báo bản cũ trong khi máy chủ đã chạy bản mới, tức là nói dối đúng lúc cần
+    tin nhất.
+
+    Rê chuột lên nhãn để xem mã commit và giờ build.
+  */
+  function versionTag() {
+    if (!state.version) return '';
+    var v = state.version;
+    var tip = 'commit ' + (v.buildId || '?') + (v.builtAt ? ' · build ' + v.builtAt : '');
+    return ' <span class="vtag" title="' + attr(tip) + '">v' + esc(v.version) + '</span>';
+  }
+
   function sidebar() {
     return '<aside class="sidebar">' +
       '<div class="sidebar__brand">' +
         '<div class="sidebar__mark">' + flowerMark(23) + '</div>' +
         '<div style="min-width:0">' +
-          '<div class="sidebar__name">APP TẠO GIÁO ÁN</div>' +
+          '<div class="sidebar__nameline">' +
+            '<span class="sidebar__name">APP TẠO GIÁO ÁN</span>' + versionTag() +
+          '</div>' +
           '<div class="sidebar__sub">Trợ lý AI cho giáo viên mầm non</div>' +
         '</div>' +
       '</div>' +
@@ -390,7 +418,9 @@
 
   function viewWizard() {
     var panels = [step1, step2, step3, step4, step5];
-    return '<div class="wrap wrap--narrow">' +
+    /* Dùng hết bề ngang như trang chủ. Các màn nhiều chữ (hồ sơ, tải Word,
+       xem trước) vẫn giữ wrap--narrow vì dòng dài đọc mệt. */
+    return '<div class="wrap">' +
       '<div class="wizard-head"><h1 class="h1">Tạo giáo án mới</h1>' +
       '<div class="wizard-head__count">Bước ' + state.step + ' / 5</div></div>' +
       '<div class="steps">' +
@@ -553,6 +583,27 @@
       ['Giọng văn', state.tone]
     ];
     var aiOff = !state.adminToggles.ai;
+
+    /* Thanh chờ AI. Xem generate() để hiểu vì sao tiến độ chỉ là ước lượng
+       theo thời gian chứ không phải tiến độ thật. */
+    function progressBar() {
+      var pct = Math.round(state.genPct || 0);
+      var sec = state.genSec || 0;
+      var mm = Math.floor(sec / 60), ss = sec % 60;
+      var clock = mm > 0 ? mm + ' phút ' + ss + ' giây' : sec + ' giây';
+      return '<div class="genbar">' +
+        '<div class="genbar__track">' +
+          '<div class="genbar__fill" style="width:' + pct + '%"></div>' +
+        '</div>' +
+        '<div class="genbar__meta">' +
+          '<span class="genbar__stage">' + esc(state.genStage || '') + '</span>' +
+          '<span class="genbar__time">đã chờ ' + esc(clock) + '</span>' +
+        '</div>' +
+        '<div class="genbar__hint">Soạn một giáo án đầy đủ thường mất khoảng 2 phút. ' +
+        'Chị cứ để yên trang này.</div>' +
+      '</div>';
+    }
+
     var note = state.generating
       ? 'Đang dựng mục tiêu, phần chuẩn bị và bảng hoạt động hai cột.'
       : aiOff
@@ -576,6 +627,7 @@
         (state.generating ? 'ĐANG TẠO GIÁO ÁN...' : 'TẠO GIÁO ÁN BẰNG AI') + '</button>' +
         '<div class="generate-note">' + esc(note) + '</div>' +
       '</div>' +
+      (state.generating ? progressBar() : '') +
       (state.aiError ? '<div class="note-red" style="margin-top:18px">' + esc(state.aiError) + '</div>' : '') +
     '</div>';
   }
@@ -1298,13 +1350,70 @@
     render();
   }
 
+  /*
+    Thanh tiến trình cho lúc chờ AI.
+
+    Máy chủ trả kết quả một lần duy nhất, không có luồng dữ liệu chạy dần, nên
+    KHÔNG có tiến độ thật để hiển thị. Thanh này chạy theo thời gian: tăng
+    nhanh lúc đầu rồi chậm dần, tiệm cận 92% và DỪNG ở đó cho tới khi kết quả
+    thật về mới nhảy lên 100%.
+
+    Cố ý không bao giờ tự chạm 100%: thanh đầy mà vẫn phải chờ thì còn khó chịu
+    hơn là không có thanh nào. Kèm số giây đã trôi để cô biết máy vẫn đang chạy
+    chứ không treo.
+  */
+  var GEN_STAGES = [
+    [0, 'Đang đọc lại lựa chọn của chị…'],
+    [12, 'Đang dựng mục tiêu và phần chuẩn bị…'],
+    [35, 'Đang viết bảng hoạt động hai cột…'],
+    [75, 'Đang rà lại thời lượng và phân hóa…'],
+    [110, 'Sắp xong, đang hoàn thiện…']
+  ];
+
+  function genTick() {
+    var sec = (Date.now() - state.genStartedAt) / 1000;
+    /* Đường cong tiệm cận: nhanh ở đầu, chậm dần về sau. tau=45 cho khoảng
+       88% ở mốc 90 giây — sát với thời gian thực đo được (~2 phút). */
+    state.genPct = Math.min(92, 92 * (1 - Math.exp(-sec / 45)));
+    state.genSec = Math.floor(sec);
+    var label = GEN_STAGES[0][1];
+    for (var i = 0; i < GEN_STAGES.length; i++) {
+      if (sec >= GEN_STAGES[i][0]) label = GEN_STAGES[i][1];
+    }
+    state.genStage = label;
+
+    /* Sửa thẳng ba nút DOM thay vì render() cả app. Vẽ lại toàn bộ 2 lần mỗi
+       giây trong 2 phút là 240 lần dựng DOM không cần thiết, và mỗi lần dựng
+       lại phần tử là hiệu ứng trượt CSS bị huỷ nên thanh chạy giật. */
+    var fill = document.querySelector('.genbar__fill');
+    if (!fill) return;   /* cô đã chuyển sang màn khác — bỏ qua */
+    fill.style.width = Math.round(state.genPct) + '%';
+
+    var stage = document.querySelector('.genbar__stage');
+    if (stage) stage.textContent = state.genStage;
+
+    var time = document.querySelector('.genbar__time');
+    if (time) {
+      var s = state.genSec, mm = Math.floor(s / 60), ss = s % 60;
+      time.textContent = 'đã chờ ' + (mm > 0 ? mm + ' phút ' + ss + ' giây' : s + ' giây');
+    }
+  }
+
   function generate() {
     if (state.generating) return;
     state.generating = true;
     state.aiError = null;
+    state.genStartedAt = Date.now();
+    state.genPct = 0;
+    state.genSec = 0;
+    state.genStage = GEN_STAGES[0][1];
+    clearInterval(state._genTimer);
+    state._genTimer = setInterval(genTick, 500);
     render();
 
     C.generate(state).then(function (result) {
+      clearInterval(state._genTimer);
+      state._genTimer = null;
       state.generating = false;
       state.lesson = result.lesson;
       state.lessonSource = result.source;
@@ -1406,10 +1515,43 @@
         render();
         return;
       }
+      if (state.loginBusy) return;   /* chặn bấm hai lần khi mạng chậm */
+      state.loginBusy = true;
       state.loginError = null;
-      goto('dashboard');
+      render();
+
+      fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ username: f.username, password: f.password })
+      }).then(function (res) {
+        return res.json().catch(function () { return null; }).then(function (data) {
+          return { ok: res.ok, data: data };
+        });
+      }).then(function (r) {
+        state.loginBusy = false;
+        if (r.ok && r.data && r.data.ok) {
+          /* Không giữ lại mật khẩu trong bộ nhớ sau khi đã dùng xong. */
+          state.loginForm = { username: '', password: '' };
+          state.loginError = null;
+          goto('dashboard');
+          return;
+        }
+        state.loginError = (r.data && r.data.error) || 'Không đăng nhập được.';
+        render();
+      }).catch(function () {
+        state.loginBusy = false;
+        state.loginError = 'Không nối được máy chủ. Kiểm tra lại đường mạng.';
+        render();
+      });
     },
-    logout: function () { goto('login'); },
+    logout: function () {
+      /* Đưa về màn hình đăng nhập ngay, không đợi máy chủ trả lời — cô đã bấm
+         thì phải thấy mình đã ra khỏi app. Cookie vẫn được xoá ở nền. */
+      fetch('/api/logout', { method: 'POST' }).catch(function () {});
+      state.loginForm = { username: '', password: '' };
+      goto('login');
+    },
     go: function (el) { goto(el.getAttribute('data-value')); },
     'start-wizard': function () { state.step = 1; goto('wizard'); },
 
@@ -1721,6 +1863,38 @@
      C.hasModel() (ví dụ ở bước 5 của wizard) cập nhật đúng ngay khi biết. */
   C.onAiStatusChange = render;
 
+  /* Phiên hết hạn khi đang soạn dở: đưa về đăng nhập kèm lời nhắc rõ ràng. */
+  C.onUnauthorized = function () {
+    state.loginError = 'Phiên đăng nhập đã hết hạn. Chị đăng nhập lại giúp.';
+    goto('login');
+  };
+
   stamp('Mở giáo án mẫu');
   render();
+
+  /*
+    Hỏi máy chủ xem còn phiên đăng nhập không. Vẽ trước rồi mới hỏi để không có
+    khoảng trắng lúc chờ mạng.
+
+    Quan trọng: chưa đăng nhập thì ép về màn hình đăng nhập, kể cả khi URL có
+    ?screen=dashboard. Trước đây tham số đó đi thẳng vào state.view nên gõ tay
+    là bỏ qua được đăng nhập. Đây chỉ là lớp giao diện — chốt chặn thật nằm ở
+    máy chủ, /api/generate tự kiểm tra phiên.
+  */
+  fetch('/api/version', { cache: 'no-store' })
+    .then(function (r) { return r.json(); })
+    .then(function (v) { state.version = v; render(); })
+    .catch(function () { /* không lấy được thì thôi, không hiện nhãn */ });
+
+  fetch('/api/session', { cache: 'no-store' })
+    .then(function (r) { return r.json(); })
+    .then(function (s) {
+      if (!s.loggedIn) {
+        if (state.view !== 'login') goto('login');
+      } else if (state.view === 'login') {
+        /* Còn phiên thì khỏi bắt đăng nhập lại. Không có ?screen thì về trang chủ. */
+        goto(startView !== 'login' ? startView : 'dashboard');
+      }
+    })
+    .catch(function () { /* mất mạng: giữ nguyên màn hình đang hiện */ });
 })();

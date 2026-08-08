@@ -1,6 +1,51 @@
-# File thử nghiệm tạm thời, không thuộc app.
+# ── Bí mật ───────────────────────────────────────────────────────────────
+#
+# TUYỆT ĐỐI không commit. Đẩy nhầm một lần là phải đổi toàn bộ mật khẩu, vì
+# lịch sử git giữ lại mãi kể cả khi xoá file ở lần commit sau.
+#
+#   hoc-ai-contabo-vps.env  — IP, tài khoản, mật khẩu SSH của VPS
+#   .env                    — docker compose đọc để lấy AUTH_PASS_HASH
+*.env
+.env
+.env.*
+!.env.example
+
+# Thông tin đăng nhập Claude Code, nếu lỡ chép vào thư mục dự án.
+.credentials.json
+.claude.json
+
+# Chứng chỉ và khoá riêng.
+*.pem
+*.key
+*.p12
+
+# ── Thư mục làm việc lúc chạy ────────────────────────────────────────────
+
+# Thư mục riêng cho tiến trình claude, để nó không đọc nhầm ngữ cảnh dự án khác.
+.ai-cwd/
+
+# ── Node ─────────────────────────────────────────────────────────────────
+
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ── File tạm khi thử nghiệm ──────────────────────────────────────────────
+
 __test.docx
 *.crdownload
+*.tmp
+*.bak
 
-# Thư mục làm việc riêng cho tiến trình claude.exe khi chạy ai-server.ps1.
-.ai-cwd/
+# Giáo án và slide xuất ra lúc thử — không thuộc mã nguồn.
+*.docx
+*.pptx
+!docs/**/*.docx
+
+# ── Hệ điều hành và trình soạn thảo ──────────────────────────────────────
+
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
