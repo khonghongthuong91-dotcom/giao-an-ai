@@ -3,8 +3,12 @@
 # TUYỆT ĐỐI không commit. Đẩy nhầm một lần là phải đổi toàn bộ mật khẩu, vì
 # lịch sử git giữ lại mãi kể cả khi xoá file ở lần commit sau.
 #
-#   hoc-ai-contabo-vps.env  — IP, tài khoản, mật khẩu SSH của VPS
-#   .env                    — docker compose đọc để lấy AUTH_PASS_HASH
+# IP, tài khoản và mật khẩu SSH của VPS. Chặn tường minh theo đúng tên file,
+# không chỉ dựa vào luật *.env bên dưới — đổi tên luật chung một lần là mất
+# lớp bảo vệ mà không ai để ý.
+hoc-ai-contabo-vps.env
+
+# docker compose đọc file này để lấy AUTH_PASS_HASH.
 *.env
 .env
 .env.*
