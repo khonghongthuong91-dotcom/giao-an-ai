@@ -282,10 +282,38 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     return res.end('404: ' + rel);
   }
-  const buf = fs.readFileSync(full);
+  /*
+    Chống phục vụ bản cũ sau khi deploy.
+
+    Đứng trước app là Cloudflare, và Cloudflare tự cache mọi file .js/.css
+    trong 4 tiếng khi máy chủ không nói gì về cache. Vì index.html gọi
+    "js/app.js" trần nên URL không đổi qua các lần deploy: /api/version báo
+    bản mới trong khi giao diện vẫn là bản cũ, đúng lỗi đã gặp ở 1.1.6.
+
+    Cách chữa: dán số phiên bản vào URL của js/css. Bản mới là URL mới nên
+    Cloudflare và trình duyệt buộc phải tải lại; đổi lại URL đã có nhãn thì
+    cache được thoải mái.
+  */
+  const isHtml = full.endsWith('.html');
+  let buf = fs.readFileSync(full);
+  if (isHtml) {
+    buf = Buffer.from(
+      buf.toString('utf8').replace(
+        /(src|href)="((?:js|css)\/[^"]+)"/g,
+        `$1="$2?v=${appVersion.version}"`,
+      ),
+      'utf8',
+    );
+  }
+  // index.html phải hỏi lại máy chủ mỗi lần, nếu không thì URL mang nhãn phiên
+  // bản mới không bao giờ tới được trình duyệt và mọi thứ trên vô nghĩa.
+  const cacheControl = isHtml || !url.searchParams.has('v')
+    ? 'no-cache'
+    : 'public, max-age=31536000, immutable';
   res.writeHead(200, {
     'Content-Type': mime[path.extname(full).toLowerCase()] || 'application/octet-stream',
     'Content-Length': buf.length,
+    'Cache-Control': cacheControl,
   });
   res.end(buf);
 });

@@ -82,6 +82,48 @@ giáo án, Trình soạn thảo. Không còn tên người thật, không có l�
 **Trên VPS (1.1.6):** đăng nhập qua HTTPS trả đúng `user`; `js/data.js` và
 `js/app.js` tải về không còn tên nào.
 
+## Lỗi: deploy xong vẫn thấy giao diện cũ (phiên bản 1.1.7)
+
+Sau khi lên 1.1.6, người dùng vẫn thấy "Chào cô Thương!" dù nhãn phiên bản đã
+hiện v1.1.6.
+
+**Bằng chứng từng lớp** (curl qua Cloudflare, User-Agent trình duyệt):
+
+| Tài nguyên | cf-cache-status | cache-control | Kết luận |
+|---|---|---|---|
+| `/api/version` | DYNAMIC | `no-store` (app tự đặt) | luôn mới → nhãn đúng |
+| `/` (index.html) | DYNAMIC | không có | luôn mới |
+| `/js/app.js` | **HIT, age 4885** | `max-age=14400` | **bản cũ 4 tiếng** |
+| `/css/app.css` | HIT, age 4942 | `max-age=14400` | bản cũ |
+
+**Nguyên nhân gốc:** `ai-server.mjs` phục vụ file tĩnh mà không đặt
+`Cache-Control` (chỉ có Content-Type và Content-Length). Cloudflare gặp
+`.js`/`.css` không có chỉ dẫn thì tự cache 4 tiếng. Vì `index.html` gọi
+`js/app.js` trần nên URL không đổi qua các lần deploy — bản cũ ở biên
+Cloudflare cứ thế phục vụ tiếp cho tới hết hạn. Chỉ `/api/version` thoát vì
+app đặt `no-store` cho riêng nó.
+
+**Kiểm chứng giả thuyết trước khi sửa:** gọi `/js/app.js?v=1.1.6` qua
+Cloudflare → `MISS`, nội dung là bản mới. Nguồn luôn đúng, chỉ URL cũ bị giữ.
+
+**Cách sửa:** dán số phiên bản vào URL js/css ngay khi phục vụ `index.html`.
+
+- [x] `index.html` được phục vụ với `Cache-Control: no-cache` và các thẻ
+      `src`/`href` trỏ tới `js|css` được thêm `?v=<phiên bản>`
+- [x] File có `?v=` → `public, max-age=31536000, immutable`; không có `?v=` →
+      `no-cache`
+- [x] Link phông chữ Google (URL tuyệt đối) không bị đụng tới
+
+**Kiểm thử** (`scratchpad/test-cache.sh`, 7 bài): chạy trước khi sửa 6/7 hỏng,
+sau khi sửa 7/7 đạt.
+
+**Trên production:** `index.html` trỏ tới `js/app.js?v=1.1.7`, header
+`no-cache`; file đó trả `MISS` và không còn tên cũ. Chụp màn hình
+https://giaoan.workzone.ai.vn bằng Chrome thật: hiện đúng chữ của bản mới.
+
+Không cần xoá cache thủ công trên Cloudflare — URL đổi theo phiên bản nên bản
+cũ tự bị bỏ qua, và từ nay mỗi lần deploy đều tự động như vậy.
+
 ## Ghi chú
 
 - Khoá ký cookie dẫn xuất từ toàn bộ danh sách hash → thêm/bớt tài khoản làm
