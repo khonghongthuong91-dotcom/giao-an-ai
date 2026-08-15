@@ -50,16 +50,41 @@ function claudeAvailable() {
   return claudeFound;
 }
 
-// Không cấu hình tài khoản thì app vẫn chạy nhưng KHÔNG chặn gì — chỉ chấp
-// nhận khi nghịch ở máy cá nhân. Trên VPS luôn có biến môi trường trong
-// docker-compose.yml, và log cảnh báo bên dưới sẽ hiện rõ nếu quên.
+/*
+  Tài khoản đến từ hai nguồn, gộp lại thành một danh sách:
+
+  AUTH_USER + AUTH_PASS_HASH — tài khoản chung của cả trường.
+  AUTH_USERS                 — các tài khoản riêng, dạng "tên:hash" ngăn cách
+                               bằng dấu phẩy. Email không chứa dấu phẩy và
+                               chuỗi băm scrypt cũng vậy, nên tách kiểu này
+                               không nhập nhằng.
+
+  Không cấu hình tài khoản nào thì app vẫn chạy nhưng KHÔNG chặn gì — chỉ chấp
+  nhận khi nghịch ở máy cá nhân. Trên VPS luôn có biến môi trường trong
+  docker-compose.yml, và log cảnh báo bên dưới sẽ hiện rõ nếu quên.
+*/
+function parseAccountList(raw) {
+  return String(raw || '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const sep = entry.indexOf(':');
+      if (sep < 1) return null;
+      return { user: entry.slice(0, sep).trim(), passHash: entry.slice(sep + 1).trim() };
+    })
+    .filter(Boolean);
+}
+
 let auth = null;
+const accounts = [];
 if (process.env.AUTH_USER && process.env.AUTH_PASS_HASH) {
-  auth = createAuth({
-    user: process.env.AUTH_USER,
-    passHash: process.env.AUTH_PASS_HASH,
-    secret: process.env.SESSION_SECRET || '',
-  });
+  accounts.push({ user: process.env.AUTH_USER, passHash: process.env.AUTH_PASS_HASH });
+}
+accounts.push(...parseAccountList(process.env.AUTH_USERS));
+if (accounts.length) {
+  auth = createAuth({ accounts, secret: process.env.SESSION_SECRET || '' });
+  console.log(`[auth] ${accounts.length} tai khoan: ${accounts.map((a) => a.user).join(', ')}`);
 } else {
   console.warn('[auth] CHUA DAT AUTH_USER/AUTH_PASS_HASH — moi nguoi deu goi duoc /api/generate.');
 }
@@ -93,9 +118,15 @@ const appVersion = (() => {
   return { version, buildId, builtAt: process.env.BUILT_AT || '' };
 })();
 
+// Tên đăng nhập của phiên hiện tại, hoặc null. Không bật xác thực thì trả ''
+// — vẫn "đã đăng nhập" nhưng không có danh tính để hiện lên giao diện.
+function currentUser(req) {
+  if (!auth) return '';
+  return auth.tokenUser(parseCookies(req.headers.cookie)[auth.cookieName]);
+}
+
 function loggedIn(req) {
-  if (!auth) return true;
-  return auth.tokenValid(parseCookies(req.headers.cookie)[auth.cookieName]);
+  return currentUser(req) !== null;
 }
 
 const mime = {
@@ -179,11 +210,12 @@ const server = http.createServer(async (req, res) => {
   // App hỏi cái này lúc khởi động để biết nên hiện màn hình đăng nhập hay vào
   // thẳng trang chủ.
   if (req.method === 'GET' && pathname === '/api/session') {
-    return sendJson(res, { loggedIn: loggedIn(req) });
+    const user = currentUser(req);
+    return sendJson(res, { loggedIn: user !== null, user: user || '' });
   }
 
   if (req.method === 'POST' && pathname === '/api/login') {
-    if (!auth) return sendJson(res, { ok: true });
+    if (!auth) return sendJson(res, { ok: true, user: '' });
     const ip = clientIp(req);
     if (auth.tooManyFails(ip)) {
       return sendJson(res, { ok: false, error: 'Sai quá nhiều lần. Chờ một phút rồi thử lại.' }, 429);
@@ -194,7 +226,8 @@ const server = http.createServer(async (req, res) => {
     try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
     catch { body = null; }
 
-    const okCreds = body && auth.checkCredentials(String(body.username || ''), String(body.password || ''));
+    const username = body ? String(body.username || '') : '';
+    const okCreds = body && auth.checkCredentials(username, String(body.password || ''));
     if (!okCreds) {
       auth.noteFail(ip);
       // Thông báo chung chung: nói rõ "sai mật khẩu" là xác nhận tên đăng nhập
@@ -203,11 +236,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     auth.clearFails(ip);
-    res.setHeader('Set-Cookie', buildCookie(auth.cookieName, auth.issueToken(), {
+    res.setHeader('Set-Cookie', buildCookie(auth.cookieName, auth.issueToken(username), {
       maxAgeSec: auth.sessionDays * 86400,
       secure: isHttps(req),
     }));
-    return sendJson(res, { ok: true });
+    return sendJson(res, { ok: true, user: username });
   }
 
   if (req.method === 'POST' && pathname === '/api/logout') {

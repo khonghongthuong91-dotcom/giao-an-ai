@@ -16,9 +16,11 @@
   function sampleLesson() {
     return {
       info: {
-        school: 'Trường Mầm non Hoa Sen',
-        teacher: 'Nguyễn Hồng Thương',
-        className: 'Lớp ghép Hoa Cúc',
+        // Trường, giáo viên, lớp để trống — giáo viên tự điền ở wizard hoặc
+        // Hồ sơ cá nhân. Ghi cứng tên ai đó thì tên đó hiện ra với cả trường.
+        school: '',
+        teacher: '',
+        className: '',
         ageLabel: 'Lớp ghép: 3–4 tuổi và 4–5 tuổi',
         size: '24 trẻ',
         date: '12/09/2026',
@@ -28,7 +30,7 @@
         domain: 'Phát triển tình cảm và kỹ năng xã hội',
         type: 'giáo dục cảm xúc',
         duration: '25–30 phút',
-        place: 'Phòng học lớp Hoa Cúc',
+        place: 'Phòng học của lớp',
         form: 'Kết hợp cả lớp và nhóm nhỏ'
       },
       objectives: {
@@ -196,9 +198,6 @@
   window.DATA = {
     sampleLesson: sampleLesson,
 
-    /* Giáo viên đang đăng nhập — bản thiết kế ghi cứng ở thanh bên. */
-    user: { initials: 'HT', name: 'Khổng Hồng Thương', role: 'Giáo viên · MN Phúc Than' },
-
     /* 5 điểm giới thiệu ở màn hình đăng nhập. */
     loginFeatures: [
       { n: '1', title: 'Wizard 5 bước', body: 'Thông tin, mục tiêu, nội dung tích hợp, phương pháp, tạo và kiểm tra.' },
@@ -289,11 +288,13 @@
       { id: 'p6', title: 'Sử dụng thiết bị cùng người lớn', age: '5–6 TUỔI', domain: 'Đa lĩnh vực', theme: 'Năng lực số', date: '26/08/2026' }
     ],
 
-    /* Hồ sơ cá nhân mặc định — giáo viên tự sửa ở màn Hồ sơ cá nhân. */
+    /* Hồ sơ cá nhân mặc định — để trống, giáo viên tự điền ở màn Hồ sơ cá nhân.
+       Không ghi cứng tên người thật ở đây: app dùng chung một tài khoản cho cả
+       trường nên tên của ai đó sẽ hiện ra với tất cả mọi người. */
     profileDefault: {
-      hoTen: 'Khổng Hồng Thương', username: 'giaovien', email: '',
-      truong: 'MN Phúc Than', lop: 'Lớp ghép Hoa Cúc', tinh: '',
-      nhomTuoi: ['Trẻ 3–4 tuổi', 'Trẻ 4–5 tuổi'], mauMacDinh: 'Giáo án hoạt động học', chuKy: 'Khổng Hồng Thương'
+      hoTen: '', username: '', email: '',
+      truong: '', lop: '', tinh: '',
+      nhomTuoi: [], mauMacDinh: 'Giáo án hoạt động học', chuKy: ''
     },
 
     /* Kho học liệu: đoạn thơ, chuyện, trò chơi, hoạt động STEAM/Montessori có

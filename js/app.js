@@ -34,6 +34,10 @@
     loginError: null,
     loginBusy: false,
 
+    /* Tên đăng nhập của phiên hiện tại, do máy chủ trả về. Rỗng khi chạy ở máy
+       cá nhân không bật xác thực. */
+    account: '',
+
     /* Lựa chọn trong wizard — giá trị mặc định lấy từ bản thiết kế. */
     mixed: true,
     ages: ['Lớp ghép nhiều độ tuổi'],
@@ -46,16 +50,18 @@
     detail: 'Giáo án tiêu chuẩn',
     tone: 'Gần gũi, dễ thực hiện',
     form: {
-      school: 'Trường Mầm non Hoa Sen',
-      teacher: 'Nguyễn Hồng Thương',
-      className: 'Lớp ghép Hoa Cúc',
+      /* Trường, giáo viên, lớp để trống — cô tự điền. Ghi cứng tên một người
+         thì cả trường dùng chung tài khoản đều thấy tên đó. */
+      school: '',
+      teacher: '',
+      className: '',
       size: '24',
       date: '12/09/2026',
       duration: '25–30 phút',
       theme: 'Bản thân',
       subtheme: 'Cảm xúc của tôi',
       activity: 'Khi con tức giận',
-      place: 'Phòng học lớp Hoa Cúc',
+      place: 'Phòng học của lớp',
       form: 'Kết hợp cả lớp và nhóm nhỏ',
       objectives: '',
       known: 'Trẻ đã gọi được tên cảm xúc vui và buồn.',
@@ -263,7 +269,7 @@
             (state.loginBusy ? 'disabled ' : '') +
             'data-action="login">' + (state.loginBusy ? 'Đang kiểm tra…' : 'Đăng nhập') + '</button>' +
           '</div>' +
-          '<div class="login__fine">Cả trường dùng chung một tài khoản — hỏi người phụ trách để lấy mật khẩu. ' +
+          '<div class="login__fine">Hỏi người phụ trách để lấy tài khoản và mật khẩu. ' +
           'Ứng dụng không thu thập tên thật, hình ảnh hay thông tin định danh của trẻ.</div>' +
         '</div>' +
       '</div>' +
@@ -298,6 +304,12 @@
     return ' <span class="vtag" title="' + attr(tip) + '">v' + esc(v.version) + '</span>';
   }
 
+  /* Hai chữ cái đầu của tên đăng nhập, viết hoa — đủ để phân biệt tài khoản mà
+     không cần ai khai họ tên. */
+  function accountInitials() {
+    return state.account.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || '?';
+  }
+
   function sidebar() {
     return '<aside class="sidebar">' +
       '<div class="sidebar__brand">' +
@@ -319,13 +331,15 @@
             (on ? ' aria-current="page"' : '') + '>' + navIcon(item[2]) + '<span>' + esc(item[1]) + '</span></button>';
         }).join('') +
       '</nav>' +
-      '<div class="who">' +
-        '<div class="who__avatar">' + esc(D.user.initials) + '</div>' +
-        '<div style="min-width:0">' +
-          '<div class="who__name">' + esc(D.user.name) + '</div>' +
-          '<div class="who__role">' + esc(D.user.role) + '</div>' +
-        '</div>' +
-      '</div>' +
+      (state.account
+        ? '<div class="who">' +
+            '<div class="who__avatar">' + esc(accountInitials()) + '</div>' +
+            '<div style="min-width:0">' +
+              '<div class="who__name">' + esc(state.account) + '</div>' +
+              '<div class="who__role">Đã đăng nhập</div>' +
+            '</div>' +
+          '</div>'
+        : '') +
       '<button type="button" class="logout" data-action="logout">Đăng xuất</button>' +
     '</aside>';
   }
@@ -338,13 +352,12 @@
 
   function viewDashboard() {
     var lib = visibleLibrary();
-    var firstName = (D.user.name || '').trim().split(' ').slice(-1)[0];
     var activeCfg = state.config.filter(function (c) { return c.status === 'Đang áp dụng'; })[0];
 
     return '<div class="wrap">' +
       '<div class="dash-top">' +
         '<div>' +
-          '<h1 class="h1 h1--dash" style="margin-bottom:4px">Chào cô ' + esc(firstName) + '!</h1>' +
+          '<h1 class="h1 h1--dash" style="margin-bottom:4px">Chào cô!</h1>' +
           '<div class="dash-top__sub">Hôm nay cô muốn soạn hoạt động nào?</div>' +
         '</div>' +
         '<div class="dash-top__right">' +
@@ -448,7 +461,7 @@
       : 'Gợi ý theo độ tuổi: 3–4 tuổi 20–25 phút, 4–5 tuổi 25–30 phút, 5–6 tuổi 30–35 phút.';
     return '<div class="card">' +
       '<h2 class="h2">Thông tin cơ bản</h2>' +
-      '<p class="lede">Các trường đã điền sẵn từ hồ sơ giáo viên. Chị có thể sửa lại.</p>' +
+      '<p class="lede">Điền thông tin trường, lớp và hoạt động. Chị có thể sửa lại ở bước sau.</p>' +
       '<div class="grid-3">' +
         field('Tên trường', 'school') +
         field('Tên giáo viên', 'teacher') +
@@ -941,7 +954,7 @@
         '<div class="grid-2">' +
           pf('Họ tên', 'hoTen') +
           '<label class="label"><span class="field-label">Tên đăng nhập</span>' +
-          '<input class="input" type="text" value="' + attr(p.username) + '" readonly ' +
+          '<input class="input" type="text" value="' + attr(state.account) + '" readonly ' +
           'style="background:var(--surface-soft);color:var(--muted)"></label>' +
           pf('Email', 'email', 'email') +
           pf('Trường', 'truong') +
@@ -1532,6 +1545,7 @@
         state.loginBusy = false;
         if (r.ok && r.data && r.data.ok) {
           /* Không giữ lại mật khẩu trong bộ nhớ sau khi đã dùng xong. */
+          state.account = r.data.user || '';
           state.loginForm = { username: '', password: '' };
           state.loginError = null;
           goto('dashboard');
@@ -1549,6 +1563,7 @@
       /* Đưa về màn hình đăng nhập ngay, không đợi máy chủ trả lời — cô đã bấm
          thì phải thấy mình đã ra khỏi app. Cookie vẫn được xoá ở nền. */
       fetch('/api/logout', { method: 'POST' }).catch(function () {});
+      state.account = '';
       state.loginForm = { username: '', password: '' };
       goto('login');
     },
@@ -1889,11 +1904,17 @@
   fetch('/api/session', { cache: 'no-store' })
     .then(function (r) { return r.json(); })
     .then(function (s) {
+      state.account = s.user || '';
       if (!s.loggedIn) {
         if (state.view !== 'login') goto('login');
+        else render();
       } else if (state.view === 'login') {
         /* Còn phiên thì khỏi bắt đăng nhập lại. Không có ?screen thì về trang chủ. */
         goto(startView !== 'login' ? startView : 'dashboard');
+      } else {
+        /* Đã ở đúng màn hình rồi thì vẫn phải vẽ lại, không thì thanh bên
+           thiếu tên tài khoản vừa lấy về. */
+        render();
       }
     })
     .catch(function () { /* mất mạng: giữ nguyên màn hình đang hiện */ });

@@ -27,6 +27,13 @@ services:
       # cookie dẫn xuất từ chính chuỗi băm này.
       AUTH_USER: "${AUTH_USER:-giaoan}"
       AUTH_PASS_HASH: "${AUTH_PASS_HASH:-}"
+
+      # Tài khoản riêng thêm vào bên cạnh tài khoản chung, dạng "tên:hash"
+      # ngăn cách bằng dấu phẩy:
+      #   AUTH_USERS=co.a@truong.edu.vn:scrypt$...,co.b@truong.edu.vn:scrypt$...
+      # Thêm hoặc bớt tài khoản làm mọi phiên đang đăng nhập mất hiệu lực, vì
+      # khoá ký cookie dẫn xuất từ toàn bộ danh sách băm.
+      AUTH_USERS: "${AUTH_USERS:-}"
     volumes:
       # Chỉ-đọc: container chép ra chỗ riêng, không bao giờ sửa được thông tin
       # đăng nhập của máy chủ.

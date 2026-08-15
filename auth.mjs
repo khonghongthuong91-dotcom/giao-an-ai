@@ -1,4 +1,5 @@
-// Xác thực cho APP Tạo Giáo Án — một tài khoản dùng chung cho cả trường.
+// Xác thực cho APP Tạo Giáo Án — một tài khoản chung cho cả trường, cộng thêm
+// các tài khoản riêng khi cần.
 //
 // Tách khỏi ai-server.mjs để phần này đọc được độc lập: mật khẩu băm thế nào,
 // cookie ký ra sao, chặn dò mật khẩu ở đâu — tất cả nằm gọn một chỗ.
@@ -41,39 +42,51 @@ export function verifyPassword(plain, stored) {
 /* ── Cookie phiên ──────────────────────────────────────────────────────── */
 
 /*
-  Cookie tự chứng thực: "<hạn dùng>.<chữ ký HMAC của hạn dùng>". Không có bảng
-  phiên trong RAM, nên dựng lại container không đá ai ra ngoài — quan trọng vì
-  app này deploy khá thường xuyên.
+  Cookie tự chứng thực: "<tên đăng nhập>.<hạn dùng>.<chữ ký HMAC của hai phần
+  trước>". Không có bảng phiên trong RAM, nên dựng lại container không đá ai ra
+  ngoài — quan trọng vì app này deploy khá thường xuyên.
+
+  Tên đăng nhập mã hoá base64url chứ không để thô: bảng chữ cái base64url không
+  có dấu chấm, nên tách ba phần bằng dấu chấm luôn đúng kể cả khi tên đăng nhập
+  là email (gmail.com có dấu chấm).
 */
-export function createAuth({ user, passHash, secret }) {
-  if (!user || !passHash) {
-    throw new Error('Thiếu AUTH_USER hoặc AUTH_PASS_HASH.');
+export function createAuth({ accounts, secret }) {
+  const list = (accounts || []).filter((a) => a && a.user && a.passHash);
+  if (!list.length) {
+    throw new Error('Thiếu tài khoản đăng nhập.');
   }
-  // Không đặt SESSION_SECRET thì dẫn xuất từ chuỗi băm mật khẩu: ổn định qua
-  // các lần khởi động lại, và đổi mật khẩu là mọi phiên cũ mất hiệu lực luôn.
+  // Không đặt SESSION_SECRET thì dẫn xuất từ các chuỗi băm mật khẩu: ổn định
+  // qua các lần khởi động lại, và đổi mật khẩu là mọi phiên cũ mất hiệu lực
+  // luôn. Sắp xếp trước khi ghép để thứ tự khai báo tài khoản không đổi khoá.
   const key = secret
     ? Buffer.from(secret, 'utf8')
-    : crypto.createHash('sha256').update('giaoan-session:' + passHash).digest();
+    : crypto.createHash('sha256')
+        .update('giaoan-session:' + list.map((a) => a.passHash).sort().join('|'))
+        .digest();
 
   const sign = (value) =>
     crypto.createHmac('sha256', key).update(String(value)).digest('hex');
 
-  function issueToken() {
+  function issueToken(user) {
     const exp = Date.now() + SESSION_DAYS * 86400_000;
-    return `${exp}.${sign(exp)}`;
+    const name = Buffer.from(String(user), 'utf8').toString('base64url');
+    return `${name}.${exp}.${sign(name + '.' + exp)}`;
   }
 
-  function tokenValid(token) {
-    const raw = String(token || '');
-    const dot = raw.indexOf('.');
-    if (dot < 1) return false;
-    const exp = raw.slice(0, dot);
-    const sig = raw.slice(dot + 1);
-    if (!/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
-    const want = Buffer.from(sign(exp), 'utf8');
+  // Trả về tên đăng nhập nếu vé còn hiệu lực, null nếu không.
+  function tokenUser(token) {
+    const parts = String(token || '').split('.');
+    if (parts.length !== 3) return null;
+    const [name, exp, sig] = parts;
+    if (!/^\d+$/.test(exp) || Number(exp) < Date.now()) return null;
+    const want = Buffer.from(sign(name + '.' + exp), 'utf8');
     const got = Buffer.from(sig, 'utf8');
-    if (want.length !== got.length) return false;
-    return crypto.timingSafeEqual(want, got);
+    if (want.length !== got.length) return null;
+    if (!crypto.timingSafeEqual(want, got)) return null;
+    const user = Buffer.from(name, 'base64url').toString('utf8');
+    // Tài khoản đã bị gỡ khỏi cấu hình thì vé cũ cũng phải hết giá trị, dù chữ
+    // ký vẫn khớp.
+    return list.some((a) => a.user === user) ? user : null;
   }
 
   /* ── Chặn dò mật khẩu ────────────────────────────────────────────────── */
@@ -104,11 +117,23 @@ export function createAuth({ user, passHash, secret }) {
 
   function clearFails(ip) { fails.delete(ip); }
 
+  function checkCredentials(u, p) {
+    const acc = list.find((a) => a.user === u);
+    // Tên đăng nhập không có thật vẫn chạy verifyPassword một lần: bỏ qua luôn
+    // thì trả lời nhanh hơn hẳn, và chênh lệch đó đủ để người dò biết tên nào
+    // tồn tại — đúng thứ thông báo lỗi chung chung ở /api/login đang giấu.
+    if (!acc) {
+      verifyPassword(p, list[0].passHash);
+      return false;
+    }
+    return verifyPassword(p, acc.passHash);
+  }
+
   return {
     cookieName: COOKIE_NAME,
-    checkCredentials: (u, p) => u === user && verifyPassword(p, passHash),
+    checkCredentials,
     issueToken,
-    tokenValid,
+    tokenUser,
     tooManyFails,
     noteFail,
     clearFails,
